@@ -13,3 +13,6 @@ models/
 *.pt
 *.onnx
 transitshield_live_safety_response.executed.ipynb
+
+server/data/
+server/__pycache__/
