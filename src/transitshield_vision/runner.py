@@ -9,10 +9,11 @@ from typing import Any
 from .config import CameraConfig, RuntimeConfig
 from .evidence import generate_evidence_for_incident, write_metadata_only
 from .fallback import load_cached_frames, load_manual_incidents, select_execution_source
+from .geometry import bbox_footpoint
 from .incident_export import write_incidents
 from .pipeline import SafetyPipeline
 from .pose import UltralyticsPoseEstimator, match_pose_scores
-from .schemas import EVENT_TYPES, Incident, validate_incident_payload
+from .schemas import EVENT_TYPES, Incident, TrackObservation, validate_incident_payload
 from .tracker import UltralyticsByteTracker
 from .video_io import iter_video_frames
 from .visualization import AnnotatedVideoSink, annotate_frame
@@ -34,7 +35,6 @@ def _run_tracking(
     runtime: RuntimeConfig,
     camera: CameraConfig,
     cache_path: Path,
-    annotated_path: Path,
     tracker: UltralyticsByteTracker | None,
     pose_estimator: UltralyticsPoseEstimator | None,
 ) -> tuple[list[dict[str, Any]], list[str]]:
@@ -52,8 +52,6 @@ def _run_tracking(
     pose_tracking_enabled = pose_estimator is not None
     pose_tracker_to_reset = pose_estimator
     frames: list[dict[str, Any]] = []
-    sink: AnnotatedVideoSink | None = None
-    annotation_disabled = not runtime.save_annotated_video
     try:
         for video_frame in iter_video_frames(
             camera.video_path,
@@ -71,16 +69,6 @@ def _run_tracking(
                 except Exception as error:
                     warnings.append(f"pose inference disabled at frame {video_frame.frame_index}: {error}")
                     pose_estimator = None
-            if not annotation_disabled:
-                try:
-                    sink = sink or AnnotatedVideoSink(annotated_path, fps=video_frame.fps)
-                    sink.write(annotate_frame(video_frame.raw_bgr_frame, camera.zones, tracks))
-                except Exception as error:
-                    warnings.append(f"annotated video disabled: {error}")
-                    annotation_disabled = True
-                    if sink is not None:
-                        sink.close()
-                        sink = None
             frame = {
                 "frame_index": video_frame.frame_index,
                 "timestamp_seconds": video_frame.timestamp_seconds,
@@ -108,14 +96,55 @@ def _run_tracking(
                 ]
             frames.append(frame)
     finally:
-        if sink is not None:
-            sink.close()
         tracker.reset()
         if pose_tracker_to_reset is not None:
             pose_tracker_to_reset.reset()
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     cache_path.write_text("".join(json.dumps(frame, sort_keys=True) + "\n" for frame in frames), encoding="utf-8")
     return frames, warnings
+
+
+def _cached_observations(raw_items: list[dict[str, Any]], frame_index: int, timestamp_seconds: float) -> list[TrackObservation]:
+    observations = []
+    for raw in raw_items:
+        bbox = tuple(float(value) for value in raw["bbox_xyxy"])
+        observations.append(
+            TrackObservation(
+                frame_index,
+                timestamp_seconds,
+                int(raw["track_id"]),
+                float(raw.get("confidence", 0.0)),
+                bbox,
+                bbox_footpoint(bbox),
+                max(0.0, bbox[2] - bbox[0]),
+                max(0.0, bbox[3] - bbox[1]),
+            )
+        )
+    return observations
+
+
+def _render_annotated_video(camera: CameraConfig, frames: list[dict[str, Any]], incidents: list[Incident], annotated_path: Path) -> None:
+    records = {int(frame["frame_index"]): frame for frame in frames}
+    sink: AnnotatedVideoSink | None = None
+    try:
+        for video_frame in iter_video_frames(camera.video_path, fps_override=camera.fps_override):
+            record = records.get(video_frame.frame_index, {})
+            tracks = _cached_observations(record.get("tracks", []), video_frame.frame_index, video_frame.timestamp_seconds)
+            pose_tracks = _cached_observations(record.get("pose_tracks", []), video_frame.frame_index, video_frame.timestamp_seconds)
+            sink = sink or AnnotatedVideoSink(annotated_path, fps=video_frame.fps)
+            sink.write(
+                annotate_frame(
+                    video_frame.raw_bgr_frame,
+                    camera.zones,
+                    tracks,
+                    pose_tracks=pose_tracks,
+                    incidents=incidents,
+                    timestamp_seconds=video_frame.timestamp_seconds,
+                )
+            )
+    finally:
+        if sink is not None:
+            sink.close()
 
 
 def run_pipeline(
@@ -140,8 +169,13 @@ def run_pipeline(
     warnings: list[str] = []
 
     if mode == "full_ai":
-        frames, warnings = _run_tracking(runtime, camera, default_cache, annotated_path, tracker, pose_estimator)
+        frames, warnings = _run_tracking(runtime, camera, default_cache, tracker, pose_estimator)
         incidents = SafetyPipeline(camera, event_rules, source_mode=mode, evidence_root=output_root / "incidents").process_cached_frames(frames)
+        if runtime.save_annotated_video:
+            try:
+                _render_annotated_video(camera, frames, incidents, annotated_path)
+            except Exception as error:
+                warnings.append(f"annotated video disabled: {error}")
         evidence_generator = evidence_generator or generate_evidence_for_incident
         for incident in incidents:
             try:

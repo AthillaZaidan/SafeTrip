@@ -173,6 +173,51 @@ class RunnerTests(unittest.TestCase):
 
         self.assertTrue(pose.reset_called)
 
+    def test_full_ai_renders_video_after_incidents_are_confirmed(self):
+        class Tracker:
+            def track(self, _frame, *, frame_index, timestamp_seconds):
+                return [TrackObservation(frame_index, timestamp_seconds, 1, 0.9, (0, 0, 10, 5), (5, 5), 10, 5)]
+
+            def reset(self):
+                pass
+
+        class Sink:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            def write(self, _frame):
+                pass
+
+            def close(self):
+                pass
+
+        rules = {event: values.copy() for event, values in self.rules.items()}
+        rules["possible_person_down"]["minimum_duration_seconds"] = 0
+        annotation_calls = []
+
+        def annotate(frame, _zones, _tracks, *_args, **kwargs):
+            annotation_calls.append([incident.incident_type for incident in kwargs.get("incidents", [])])
+            return frame
+
+        video_frames = [VideoFrame(0, 0.0, 25.0, "frame")]
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "transitshield_vision.runner.iter_video_frames",
+            side_effect=[iter(video_frames), iter(video_frames)],
+        ), patch("transitshield_vision.runner.AnnotatedVideoSink", Sink), patch(
+            "transitshield_vision.runner.annotate_frame",
+            side_effect=annotate,
+        ):
+            run_pipeline(
+                parse_runtime_config({"execution_mode": "full_ai", "save_annotated_video": True, "pose_weights": None}),
+                self.camera,
+                rules,
+                output_root=Path(directory) / "out",
+                tracker=Tracker(),
+                evidence_generator=lambda *_args: None,
+            )
+
+        self.assertEqual(annotation_calls, [["possible_person_down"]])
+
 
 if __name__ == "__main__":
     unittest.main()
