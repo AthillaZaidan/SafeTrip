@@ -6,8 +6,8 @@ from transitshield_vision.risk_indicators import score_indicators
 class RiskIndicatorTests(unittest.TestCase):
     def test_score_is_deterministic_and_lists_contributions(self):
         result = score_indicators(
-            "person_running_on_track",
-            {"inside_track_area": True, "normalized_speed": 1.2, "running_duration_seconds": 1.0},
+            "restricted_zone_intrusion",
+            {"inside_restricted_zone": True, "restricted_dwell_seconds": 4.0, "moving_toward_danger": True},
         )
         self.assertEqual(result.score, 80)
         self.assertEqual(result.severity, "Critical")

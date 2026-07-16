@@ -20,6 +20,7 @@ class TrackState:
     normalized_speed: float = 0.0
     direction_vector: tuple[float, float] = (0.0, 0.0)
     last_event_timestamp: dict[str, float] = field(default_factory=dict)
+    missing_updates: int = 0
 
     def normalized_speed_over(self, window_seconds: float) -> float:
         if window_seconds <= 0 or len(self.observations) < 2:
@@ -58,8 +59,7 @@ class TrackStateManager:
             )
             self.states[observation.track_id] = state
         previous = state.observations[-1] if state.observations else None
-        frame_gap = observation.frame_index - state.last_seen_frame
-        if previous is not None and frame_gap <= self.missing_frame_tolerance + 1:
+        if previous is not None and state.missing_updates <= self.missing_frame_tolerance:
             elapsed = observation.timestamp_seconds - previous.timestamp_seconds
             if elapsed > 0:
                 motion = motion_features(previous.footpoint_xy, observation.footpoint_xy, elapsed, observation.bbox_height)
@@ -70,10 +70,14 @@ class TrackStateManager:
             state.direction_vector = (0.0, 0.0)
         state.observations.append(observation)
         state.last_seen_frame = observation.frame_index
+        state.missing_updates = 0
         return state
 
-    def remove_stale(self, current_frame: int) -> list[TrackState]:
-        stale_ids = [track_id for track_id, state in self.states.items() if current_frame - state.last_seen_frame > self.missing_frame_tolerance]
+    def remove_missing(self, active_track_ids: set[int]) -> list[TrackState]:
+        for track_id, state in self.states.items():
+            if track_id not in active_track_ids:
+                state.missing_updates += 1
+        stale_ids = [track_id for track_id, state in self.states.items() if state.missing_updates > self.missing_frame_tolerance]
         return [self.states.pop(track_id) for track_id in stale_ids]
 
     def reset(self) -> None:

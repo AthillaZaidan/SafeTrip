@@ -16,8 +16,18 @@ class TrackAndZoneTests(unittest.TestCase):
         state = manager.update(observation(1, 1.0, 10))
         self.assertAlmostEqual(state.normalized_speed, 1.0)
         self.assertEqual(state.direction_vector, (1.0, 0.0))
+        manager.remove_missing(set())
+        manager.remove_missing(set())
         state = manager.update(observation(4, 4.0, 20))
         self.assertEqual(state.normalized_speed, 0.0)
+
+    def test_track_state_does_not_treat_frame_stride_as_missing_detections(self):
+        manager = TrackStateManager(history_size=4, missing_frame_tolerance=1)
+        manager.update(observation(0, 0.0, 0))
+
+        state = manager.update(observation(5, 1.0, 10))
+
+        self.assertAlmostEqual(state.normalized_speed, 1.0)
 
     def test_active_zone_uses_footpoint_and_first_configured_match(self):
         restricted = ZoneConfig("R", "CAM", "restricted", ((0, 0), (10, 0), (10, 10), (0, 10)))

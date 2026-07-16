@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from math import isclose
 from typing import Any
 
 
-EVENT_TYPES = {
+EVENT_TYPES = (
     "restricted_zone_intrusion",
     "possible_person_down",
     "crowd_compression",
-    "person_running_on_track",
-}
+)
 SOURCE_MODES = {"full_ai", "cached_ai", "manual_demo"}
 
 
@@ -59,6 +59,12 @@ class ConfirmedEvent:
     indicators: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class ClosedEvent:
+    entity_key: str
+    timestamp_seconds: float
+
+
 @dataclass
 class Incident:
     incident_id: str
@@ -87,8 +93,14 @@ class Incident:
             raise ValueError("detection_confidence must be between 0 and 1")
         if self.timestamp_detected_seconds < self.timestamp_start_seconds:
             raise ValueError("detection timestamp cannot precede event start")
+        if self.timestamp_end_seconds is not None and self.timestamp_end_seconds < self.timestamp_detected_seconds:
+            raise ValueError("end timestamp cannot precede detection timestamp")
         if self.duration_seconds < 0:
             raise ValueError("duration_seconds cannot be negative")
+        endpoint = self.timestamp_detected_seconds if self.timestamp_end_seconds is None else self.timestamp_end_seconds
+        expected_duration = endpoint - self.timestamp_start_seconds
+        if not isclose(self.duration_seconds, expected_duration, rel_tol=1e-9, abs_tol=1e-6):
+            raise ValueError("duration_seconds must match the incident timestamps")
 
     def to_dict(self) -> dict[str, Any]:
         self.validate()

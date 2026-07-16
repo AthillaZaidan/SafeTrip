@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 from .detector import _values
-from .schemas import TrackObservation
 
 
 Keypoint = tuple[float, float, float]
@@ -40,17 +39,6 @@ def bbox_iou(left: Sequence[float], right: Sequence[float]) -> float:
     left_area = max(0.0, left[2] - left[0]) * max(0.0, left[3] - left[1])
     right_area = max(0.0, right[2] - right[0]) * max(0.0, right[3] - right[1])
     return intersection / max(left_area + right_area - intersection, 1e-9)
-
-
-def match_pose_scores(tracks: Sequence[TrackObservation], poses: Sequence[tuple[Sequence[float], float]], minimum_iou: float = 0.3) -> dict[int, float]:
-    matched: dict[int, float] = {}
-    for track in tracks:
-        candidates = [(bbox_iou(track.bbox_xyxy, bbox), score) for bbox, score in poses]
-        if candidates:
-            overlap, score = max(candidates, key=lambda item: item[0])
-            if overlap >= minimum_iou:
-                matched[track.track_id] = score
-    return matched
 
 
 class UltralyticsPoseEstimator:

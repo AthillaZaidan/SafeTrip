@@ -14,11 +14,9 @@ ZONE_COLORS = {
     "limited_dwell": (0, 200, 255),
     "restricted": (0, 0, 255),
     "crowd_monitoring": (255, 170, 0),
-    "track_area": (180, 0, 255),
 }
 EVENT_COLORS = {
     "crowd_compression": (0, 165, 255),
-    "person_running_on_track": (0, 0, 255),
     "possible_person_down": (0, 0, 255),
     "restricted_zone_intrusion": (0, 0, 255),
 }
@@ -28,8 +26,6 @@ def _incident_label(incident: Incident) -> str:
     indicators = incident.indicators
     if incident.incident_type == "restricted_zone_intrusion":
         return f"RESTRICTED INTRUSION | dwell {float(indicators.get('restricted_dwell_seconds') or 0):.1f}s"
-    if incident.incident_type == "person_running_on_track":
-        return f"RUNNING ON TRACK | speed {float(indicators.get('normalized_speed') or 0):.2f}"
     if incident.incident_type == "possible_person_down":
         pose = indicators.get("horizontal_body_score")
         pose_text = "n/a" if pose is None else f"{float(pose):.2f}"

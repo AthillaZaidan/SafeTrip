@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 *.egg-info/
 .ipynb_checkpoints/
+.superpowers/
 
 # Generated vision artifacts and large local assets
 outputs/

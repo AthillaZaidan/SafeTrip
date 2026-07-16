@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..event_state_machine import EventStateMachine
-from ..schemas import ConfirmedEvent
+from ..schemas import ClosedEvent, ConfirmedEvent
 
 
 class PersonDownDetector:
@@ -11,21 +11,23 @@ class PersonDownDetector:
         self.minimum_pose_score = minimum_pose_horizontal_score
         self.machine = EventStateMachine(minimum_duration_seconds, cooldown_seconds)
 
-    def update(self, camera_id: str, track_id: int, timestamp_seconds: float, bbox_aspect_ratio: float, normalized_speed: float, horizontal_body_score: float | None, confidence: float, entity_prefix: str = "track") -> ConfirmedEvent | None:
+    def update(self, camera_id: str, track_id: int, timestamp_seconds: float, bbox_aspect_ratio: float, normalized_speed: float, horizontal_body_score: float | None, confidence: float, zone_id: str | None = None, entity_prefix: str = "track") -> ConfirmedEvent | ClosedEvent | None:
         geometry = bbox_aspect_ratio >= self.minimum_aspect_ratio and normalized_speed <= self.maximum_speed
         pose_ok = horizontal_body_score is None or horizontal_body_score >= self.minimum_pose_score
         entity_id = f"{entity_prefix}:{track_id}"
         key = f"{camera_id}:{entity_id}"
         result = self.machine.update(key, geometry and pose_ok, timestamp_seconds)
+        if result.closed_now:
+            return ClosedEvent(key, timestamp_seconds)
         if not result.confirmed_now:
             return None
         return ConfirmedEvent(
             "possible_person_down",
             camera_id,
-            None,
+            zone_id,
             key,
             [entity_id],
-            result.candidate_started_at or timestamp_seconds,
+            result.candidate_started_at if result.candidate_started_at is not None else timestamp_seconds,
             timestamp_seconds,
             confidence,
             {
@@ -36,3 +38,7 @@ class PersonDownDetector:
                 "pose_available": horizontal_body_score is not None,
             },
         )
+
+    def close(self, camera_id: str, track_id: int, timestamp_seconds: float, *, entity_prefix: str = "track") -> ClosedEvent | None:
+        update = self.update(camera_id, track_id, timestamp_seconds, 0.0, float("inf"), 0.0, 0.0, entity_prefix=entity_prefix)
+        return update if isinstance(update, ClosedEvent) else None

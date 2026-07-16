@@ -78,16 +78,17 @@ def write_evidence(
     return paths
 
 
-def write_metadata_only(incident: Incident, *, root: str | Path = "outputs/incidents") -> dict[str, str]:
+def write_metadata_only(incident: Incident, *, root: str | Path = "outputs/incidents") -> dict[str, str | None]:
     directory = ensure_evidence_directory(incident.incident_id, root)
+    metadata_path = (directory / "metadata.json").as_posix()
     paths = {
-        "snapshot_raw": (directory / "snapshot_raw.jpg").as_posix(),
-        "snapshot_annotated": (directory / "snapshot_annotated.jpg").as_posix(),
-        "clip": (directory / "evidence.mp4").as_posix(),
-        "metadata": (directory / "metadata.json").as_posix(),
+        "snapshot_raw": None,
+        "snapshot_annotated": None,
+        "clip": None,
+        "metadata": metadata_path,
     }
     incident.evidence = paths
-    Path(paths["metadata"]).write_text(json.dumps(incident.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
+    Path(metadata_path).write_text(json.dumps(incident.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
     return paths
 
 

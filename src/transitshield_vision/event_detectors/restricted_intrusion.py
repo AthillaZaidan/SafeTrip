@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..event_state_machine import EventStateMachine
-from ..schemas import ConfirmedEvent
+from ..schemas import ClosedEvent, ConfirmedEvent
 
 
 class RestrictedIntrusionDetector:
@@ -9,9 +9,11 @@ class RestrictedIntrusionDetector:
         self.machine = EventStateMachine(minimum_duration_seconds, cooldown_seconds)
         self.direction_threshold = direction_threshold
 
-    def update(self, camera_id: str, zone_id: str, track_id: int, timestamp_seconds: float, inside: bool, direction_alignment: float | None, confidence: float) -> ConfirmedEvent | None:
+    def update(self, camera_id: str, zone_id: str, track_id: int, timestamp_seconds: float, inside: bool, direction_alignment: float | None, confidence: float) -> ConfirmedEvent | ClosedEvent | None:
         key = f"{camera_id}:{zone_id}:track:{track_id}"
         result = self.machine.update(key, inside, timestamp_seconds)
+        if result.closed_now:
+            return ClosedEvent(key, timestamp_seconds)
         if not result.confirmed_now:
             return None
         return ConfirmedEvent(
@@ -20,7 +22,7 @@ class RestrictedIntrusionDetector:
             zone_id,
             key,
             [f"track:{track_id}"],
-            result.candidate_started_at or timestamp_seconds,
+            result.candidate_started_at if result.candidate_started_at is not None else timestamp_seconds,
             timestamp_seconds,
             confidence,
             {
@@ -31,3 +33,7 @@ class RestrictedIntrusionDetector:
                 "people_count": 1,
             },
         )
+
+    def close(self, camera_id: str, zone_id: str, track_id: int, timestamp_seconds: float) -> ClosedEvent | None:
+        update = self.update(camera_id, zone_id, track_id, timestamp_seconds, False, None, 0.0)
+        return update if isinstance(update, ClosedEvent) else None

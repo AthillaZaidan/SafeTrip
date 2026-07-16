@@ -3,12 +3,10 @@
   "device": "auto",
   "frame_stride": 1,
   "max_frames": null,
-  "person_class_id": 0,
-  "person_confidence_threshold": 0.35,
-  "tracker": "bytetrack",
+  "person_confidence_threshold": 0.15,
+  "detector_image_size": 1280,
   "detector_weights": "yolo11n.pt",
   "pose_weights": "yolo11n-pose.pt",
   "save_annotated_video": true,
-  "save_frame_events": true,
   "random_seed": 42
 }

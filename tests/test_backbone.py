@@ -79,11 +79,12 @@ class BackboneTests(unittest.TestCase):
 
     def test_tracker_returns_track_observation_and_can_reset(self):
         model = FakeModel()
-        tracker = UltralyticsByteTracker("unused.pt", model=model)
+        tracker = UltralyticsByteTracker("unused.pt", model=model, image_size=1280)
         tracks = tracker.track("frame", frame_index=5, timestamp_seconds=0.5)
         self.assertEqual(tracks[0].track_id, 7)
         self.assertEqual(tracks[0].footpoint_xy, (6.0, 22.0))
         self.assertEqual(model.track_calls[0]["tracker"], "bytetrack.yaml")
+        self.assertEqual(model.track_calls[0]["imgsz"], 1280)
         tracker.reset()
         self.assertIsNone(model.predictor)
 

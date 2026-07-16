@@ -8,11 +8,12 @@ from .schemas import TrackObservation
 
 
 class UltralyticsByteTracker:
-    def __init__(self, weights: str, *, device: str = "auto", confidence_threshold: float = 0.35, iou_threshold: float = 0.7, model: Any = None):
+    def __init__(self, weights: str, *, device: str = "auto", confidence_threshold: float = 0.35, iou_threshold: float = 0.7, image_size: int = 640, model: Any = None):
         self.weights = weights
         self.device = device
         self.confidence_threshold = confidence_threshold
         self.iou_threshold = iou_threshold
+        self.image_size = image_size
         if model is None:
             try:
                 from ultralytics import YOLO
@@ -29,6 +30,7 @@ class UltralyticsByteTracker:
             "classes": [0],
             "conf": self.confidence_threshold,
             "iou": self.iou_threshold,
+            "imgsz": self.image_size,
             "verbose": False,
         }
         if self.device != "auto":
