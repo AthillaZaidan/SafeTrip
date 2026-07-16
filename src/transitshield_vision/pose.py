@@ -13,6 +13,7 @@ Keypoint = tuple[float, float, float]
 
 @dataclass(frozen=True)
 class PoseObservation:
+    track_id: int
     bbox_xyxy: tuple[float, float, float, float]
     keypoints: tuple[Keypoint, ...]
     confidence: float
@@ -66,17 +67,28 @@ class UltralyticsPoseEstimator:
         self.model = model
 
     def estimate(self, frame: Any) -> list[PoseObservation]:
-        arguments = {"source": frame, "conf": self.confidence_threshold, "verbose": False}
+        arguments = {
+            "source": frame,
+            "persist": True,
+            "tracker": "bytetrack.yaml",
+            "conf": self.confidence_threshold,
+            "verbose": False,
+        }
         if self.device != "auto":
             arguments["device"] = self.device
-        results = self.model.predict(**arguments)
-        if not results or results[0].boxes is None or results[0].keypoints is None:
+        results = self.model.track(**arguments)
+        if not results or results[0].boxes is None or results[0].boxes.id is None or results[0].keypoints is None:
             return []
         boxes = _values(results[0].boxes.xyxy)
         confidences = _values(results[0].boxes.conf)
+        track_ids = _values(results[0].boxes.id)
         points = _values(results[0].keypoints.data)
         observations: list[PoseObservation] = []
-        for bbox, confidence, raw_points in zip(boxes, confidences, points, strict=True):
+        for track_id, bbox, confidence, raw_points in zip(track_ids, boxes, confidences, points, strict=True):
             keypoints = tuple((float(point[0]), float(point[1]), float(point[2]) if len(point) > 2 else 1.0) for point in raw_points)
-            observations.append(PoseObservation(tuple(float(value) for value in bbox), keypoints, float(confidence), body_horizontal_score(keypoints)))
+            observations.append(PoseObservation(int(track_id), tuple(float(value) for value in bbox), keypoints, float(confidence), body_horizontal_score(keypoints)))
         return observations
+
+    def reset(self) -> None:
+        if hasattr(self.model, "predictor"):
+            self.model.predictor = None
