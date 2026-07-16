@@ -39,6 +39,7 @@ from .routes import (  # noqa: E402
 
 app.include_router(camera_router)
 app.include_router(incident_router)
+app.include_router(investigation_router)
 app.include_router(officer_router)
 app.include_router(report_router)
 app.include_router(risk_router)
