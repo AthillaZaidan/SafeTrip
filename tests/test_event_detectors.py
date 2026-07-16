@@ -35,6 +35,13 @@ class EventDetectorTests(unittest.TestCase):
         event = detector.update("CAM", "CROWD", 1.0, 19, 20, 0.2, 0.08, 0.4)
         self.assertEqual(event.event_type, "crowd_compression")
 
+    def test_crowd_growth_starts_candidate_while_density_sustains_it(self):
+        detector = CrowdCompressionDetector(0.85, 0.15, 0.12, 1.0, 5)
+        self.assertIsNone(detector.update("CAM", "CROWD", 0.0, 18, 20, 0.2, 0.08, 0.4))
+        self.assertIsNone(detector.update("CAM", "CROWD", 0.5, 19, 20, 0.0, 0.08, 0.4))
+        event = detector.update("CAM", "CROWD", 1.0, 19, 20, 0.0, 0.08, 0.4)
+        self.assertEqual(event.event_type, "crowd_compression")
+
 
 if __name__ == "__main__":
     unittest.main()

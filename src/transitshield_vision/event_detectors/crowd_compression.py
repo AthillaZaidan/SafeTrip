@@ -10,11 +10,17 @@ class CrowdCompressionDetector:
         self.minimum_density_growth = minimum_density_growth
         self.maximum_speed = maximum_average_normalized_speed
         self.machine = EventStateMachine(minimum_duration_seconds, cooldown_seconds)
+        self._growth_candidates: set[str] = set()
 
     def update(self, camera_id: str, zone_id: str, timestamp_seconds: float, people_count: int, capacity: int, density_growth: float, average_normalized_speed: float, flow_consistency: float | None) -> ConfirmedEvent | None:
         density_ratio = people_count / max(capacity, 1)
-        condition = density_ratio >= self.minimum_density_ratio and density_growth >= self.minimum_density_growth and average_normalized_speed <= self.maximum_speed
         key = f"{camera_id}:{zone_id}"
+        dense_and_slow = density_ratio >= self.minimum_density_ratio and average_normalized_speed <= self.maximum_speed
+        if not dense_and_slow:
+            self._growth_candidates.discard(key)
+        elif density_growth >= self.minimum_density_growth:
+            self._growth_candidates.add(key)
+        condition = dense_and_slow and key in self._growth_candidates
         result = self.machine.update(key, condition, timestamp_seconds)
         if not result.confirmed_now:
             return None
