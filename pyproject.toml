@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "transitshield-vision"
+version = "0.1.0"
+description = "Causal event-specific CCTV inference for TransitShield"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+  "numpy>=1.26,<3",
+  "opencv-python-headless>=4.9,<6",
+  "lap>=0.5.12,<1",
+  "ultralytics>=8.3,<9",
+]
+
+[project.optional-dependencies]
+dev = [
+  "jupyter>=1.0,<2",
+  "nbconvert>=7,<8",
+  "nbformat>=5,<6",
+  "pytest>=8,<9",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

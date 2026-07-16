@@ -1,0 +1,32 @@
+{
+  "restricted_zone_intrusion": {
+    "minimum_duration_seconds": 1.5,
+    "cooldown_seconds": 10.0,
+    "minimum_detection_confidence": 0.35,
+    "danger_direction_cosine_threshold": 0.5
+  },
+  "person_running_on_track": {
+    "minimum_duration_seconds": 0.5,
+    "cooldown_seconds": 10.0,
+    "minimum_detection_confidence": 0.35,
+    "minimum_normalized_speed": 0.9
+  },
+  "possible_person_down": {
+    "minimum_duration_seconds": 1.0,
+    "cooldown_seconds": 15.0,
+    "minimum_aspect_ratio": 1.1,
+    "maximum_normalized_speed": 0.08,
+    "motion_window_seconds": 0.75,
+    "minimum_pose_horizontal_score": 0.65,
+    "use_pose_when_available": true
+  },
+  "crowd_compression": {
+    "minimum_duration_seconds": 3.0,
+    "cooldown_seconds": 20.0,
+    "minimum_density_ratio": 0.85,
+    "minimum_density_growth": 0.15,
+    "density_growth_window_seconds": 2.0,
+    "maximum_average_normalized_speed": 0.12,
+    "maximum_flow_consistency": 0.45
+  }
+}

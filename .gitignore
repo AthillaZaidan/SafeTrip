@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.egg-info/
+.ipynb_checkpoints/
+
+# Generated vision artifacts and large local assets
+outputs/
+data/demo-videos/
+data/cached-ai/
+models/
+*.pt
+*.onnx
+transitshield_live_safety_response.executed.ipynb
+
+server/data/
+server/__pycache__/
