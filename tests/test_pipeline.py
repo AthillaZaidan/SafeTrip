@@ -87,6 +87,21 @@ class PipelineTests(unittest.TestCase):
 
         self.assertEqual([incident.incident_type for incident in incidents], ["possible_person_down"])
 
+    def test_pose_track_tolerates_stationary_bbox_jitter(self):
+        frames = [
+            {
+                "frame_index": index,
+                "timestamp_seconds": index * 0.25,
+                "tracks": [],
+                "pose_tracks": [pose_track(9, (210, 211, 209)[index % 3], 10)],
+            }
+            for index in range(8)
+        ]
+
+        incidents = SafetyPipeline(self.camera, self.rules, source_mode="cached_ai").process_cached_frames(frames)
+
+        self.assertEqual([incident.incident_type for incident in incidents], ["possible_person_down"])
+
     def test_cached_loader_rejects_missing_file_and_mode_never_falls_back(self):
         with self.assertRaises(FileNotFoundError):
             load_cached_frames("missing.jsonl")

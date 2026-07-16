@@ -31,6 +31,7 @@ class SafetyPipeline:
         self.restricted = RestrictedIntrusionDetector(float(restricted["minimum_duration_seconds"]), float(restricted["cooldown_seconds"]), float(restricted.get("danger_direction_cosine_threshold", 0.5)))
         self.running = RunningOnTrackDetector(float(running["minimum_normalized_speed"]), float(running["minimum_duration_seconds"]), float(running["cooldown_seconds"]))
         self.person_down = PersonDownDetector(float(down["minimum_aspect_ratio"]), float(down["maximum_normalized_speed"]), float(down["minimum_duration_seconds"]), float(down["cooldown_seconds"]), float(down.get("minimum_pose_horizontal_score", 0.65)))
+        self._person_down_motion_window = float(down.get("motion_window_seconds", 0.75))
         self.crowd = CrowdCompressionDetector(float(crowd["minimum_density_ratio"]), float(crowd["minimum_density_growth"]), float(crowd["maximum_average_normalized_speed"]), float(crowd["minimum_duration_seconds"]), float(crowd["cooldown_seconds"]))
         self._crowd_growth_window = float(crowd.get("density_growth_window_seconds", 2.0))
         self._crowd_history: dict[str, deque[tuple[float, float]]] = defaultdict(deque)
@@ -91,7 +92,7 @@ class SafetyPipeline:
                     observation.track_id,
                     timestamp,
                     aspect_ratio,
-                    state.normalized_speed,
+                    state.normalized_speed_over(self._person_down_motion_window),
                     raw.get("horizontal_score"),
                     observation.confidence,
                 )

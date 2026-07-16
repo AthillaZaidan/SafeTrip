@@ -16,6 +16,7 @@
     "cooldown_seconds": 15.0,
     "minimum_aspect_ratio": 1.1,
     "maximum_normalized_speed": 0.08,
+    "motion_window_seconds": 0.75,
     "minimum_pose_horizontal_score": 0.65,
     "use_pose_when_available": true
   },

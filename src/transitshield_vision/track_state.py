@@ -21,6 +21,23 @@ class TrackState:
     direction_vector: tuple[float, float] = (0.0, 0.0)
     last_event_timestamp: dict[str, float] = field(default_factory=dict)
 
+    def normalized_speed_over(self, window_seconds: float) -> float:
+        if window_seconds <= 0 or len(self.observations) < 2:
+            return self.normalized_speed
+        current = self.observations[-1]
+        previous = next(
+            (item for item in reversed(self.observations) if current.timestamp_seconds - item.timestamp_seconds >= window_seconds),
+            None,
+        )
+        if previous is None:
+            return self.normalized_speed
+        return motion_features(
+            previous.footpoint_xy,
+            current.footpoint_xy,
+            current.timestamp_seconds - previous.timestamp_seconds,
+            current.bbox_height,
+        ).normalized_speed
+
 
 class TrackStateManager:
     def __init__(self, history_size: int = 30, missing_frame_tolerance: int = 2):
