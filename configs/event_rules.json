@@ -21,7 +21,7 @@
     "use_pose_when_available": true
   },
   "crowd_compression": {
-    "minimum_duration_seconds": 3.0,
+    "minimum_duration_seconds": 1.0,
     "cooldown_seconds": 20.0,
     "minimum_density_ratio": 0.85,
     "minimum_density_growth": 0.15,

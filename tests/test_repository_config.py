@@ -13,6 +13,7 @@ class RepositoryConfigTests(unittest.TestCase):
         self.assertEqual(runtime.execution_mode, "full_ai")
         self.assertIn("track_area", {zone.zone_type for zone in camera.zones})
         self.assertEqual(len(rules), 4)
+        self.assertEqual(rules["crowd_compression"]["minimum_duration_seconds"], 1.0)
 
 
 if __name__ == "__main__":
