@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from transitshield_vision.config import parse_camera_config, parse_event_rules, parse_runtime_config
-from transitshield_vision.runner import run_pipeline
+from transitshield_vision.runner import _render_annotated_video, run_pipeline
 from transitshield_vision.schemas import Incident, TrackObservation
 from transitshield_vision.video_io import VideoFrame
 
@@ -217,6 +217,36 @@ class RunnerTests(unittest.TestCase):
             )
 
         self.assertEqual(annotation_calls, [["possible_person_down"]])
+
+    def test_second_pass_holds_tracks_across_stride_and_stops_at_last_cached_frame(self):
+        class Sink:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            def write(self, _frame):
+                pass
+
+            def close(self):
+                pass
+
+        cached_frames = [
+            {"frame_index": 0, "timestamp_seconds": 0.0, "tracks": [{"track_id": 1, "confidence": 0.9, "bbox_xyxy": [0, 0, 4, 8]}]},
+            {"frame_index": 2, "timestamp_seconds": 0.2, "tracks": [{"track_id": 2, "confidence": 0.8, "bbox_xyxy": [1, 0, 5, 8]}]},
+        ]
+        video_frames = [VideoFrame(index, index / 10, 10.0, "frame") for index in range(4)]
+        rendered_track_ids = []
+
+        def annotate(frame, _zones, tracks, *_args, **_kwargs):
+            rendered_track_ids.append([track.track_id for track in tracks])
+            return frame
+
+        with patch("transitshield_vision.runner.iter_video_frames", return_value=iter(video_frames)), patch(
+            "transitshield_vision.runner.AnnotatedVideoSink",
+            Sink,
+        ), patch("transitshield_vision.runner.annotate_frame", side_effect=annotate):
+            _render_annotated_video(self.camera, cached_frames, [], Path("unused.mp4"))
+
+        self.assertEqual(rendered_track_ids, [[1], [1], [2]])
 
 
 if __name__ == "__main__":

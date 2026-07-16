@@ -125,10 +125,15 @@ def _cached_observations(raw_items: list[dict[str, Any]], frame_index: int, time
 
 def _render_annotated_video(camera: CameraConfig, frames: list[dict[str, Any]], incidents: list[Incident], annotated_path: Path) -> None:
     records = {int(frame["frame_index"]): frame for frame in frames}
+    last_cached_frame = max(records, default=-1)
+    last_record: dict[str, Any] = {}
     sink: AnnotatedVideoSink | None = None
     try:
         for video_frame in iter_video_frames(camera.video_path, fps_override=camera.fps_override):
-            record = records.get(video_frame.frame_index, {})
+            if video_frame.frame_index > last_cached_frame:
+                break
+            last_record = records.get(video_frame.frame_index, last_record)
+            record = last_record
             tracks = _cached_observations(record.get("tracks", []), video_frame.frame_index, video_frame.timestamp_seconds)
             pose_tracks = _cached_observations(record.get("pose_tracks", []), video_frame.frame_index, video_frame.timestamp_seconds)
             sink = sink or AnnotatedVideoSink(annotated_path, fps=video_frame.fps)
