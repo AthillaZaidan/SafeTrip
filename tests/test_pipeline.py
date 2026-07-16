@@ -76,6 +76,7 @@ class PipelineTests(unittest.TestCase):
         incidents = SafetyPipeline(self.camera, self.rules, source_mode="cached_ai").process_cached_frames(frames)
 
         self.assertEqual([incident.incident_type for incident in incidents], ["possible_person_down"])
+        self.assertEqual(incidents[0].entity_ids, ["pose_track:7"])
 
     def test_pose_track_detects_person_already_down_on_first_frame(self):
         frames = [

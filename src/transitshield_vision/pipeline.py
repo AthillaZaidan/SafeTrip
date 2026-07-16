@@ -95,6 +95,7 @@ class SafetyPipeline:
                     state.normalized_speed_over(self._person_down_motion_window),
                     raw.get("horizontal_score"),
                     observation.confidence,
+                    entity_prefix="pose_track",
                 )
                 if event:
                     events.append(event)
