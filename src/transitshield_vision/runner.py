@@ -127,7 +127,7 @@ def run_pipeline(
 
     if mode == "full_ai":
         frames, warnings = _run_tracking(runtime, camera, default_cache, annotated_path, tracker, pose_estimator)
-        incidents = SafetyPipeline(camera, event_rules, source_mode=mode).process_cached_frames(frames)
+        incidents = SafetyPipeline(camera, event_rules, source_mode=mode, evidence_root=output_root / "incidents").process_cached_frames(frames)
         evidence_generator = evidence_generator or generate_evidence_for_incident
         for incident in incidents:
             try:
@@ -137,7 +137,7 @@ def run_pipeline(
                 warnings.append(f"evidence generation failed for {incident.incident_id}: {error}")
     elif mode == "cached_ai":
         frames = load_cached_frames(cache_path or default_cache)
-        incidents = SafetyPipeline(camera, event_rules, source_mode=mode).process_cached_frames(frames)
+        incidents = SafetyPipeline(camera, event_rules, source_mode=mode, evidence_root=output_root / "incidents").process_cached_frames(frames)
     else:
         if manual_path is None:
             raise ValueError("manual_demo requires manual_path")

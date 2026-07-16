@@ -42,6 +42,7 @@ class RunnerTests(unittest.TestCase):
             )
             result = run_pipeline(parse_runtime_config({"execution_mode": "cached_ai"}), self.camera, self.rules, output_root=root / "out", cache_path=cache)
             self.assertEqual(result.summary["incident_counts"]["restricted_zone_intrusion"], 1)
+            self.assertTrue(result.incidents[0].evidence["metadata"].startswith((root / "out" / "incidents").as_posix()))
             self.assertTrue((root / "out" / "incidents.json").is_file())
             self.assertTrue((root / "out" / "pipeline_summary.json").is_file())
 

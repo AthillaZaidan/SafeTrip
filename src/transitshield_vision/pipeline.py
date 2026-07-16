@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict, deque
+from pathlib import Path
 from typing import Any, Iterable
 
 from .config import CameraConfig
@@ -14,12 +15,13 @@ from .zone_analysis import calculate_direction_alignment
 
 
 class SafetyPipeline:
-    def __init__(self, camera: CameraConfig, event_rules: dict[str, dict[str, float | bool]], *, source_mode: str):
+    def __init__(self, camera: CameraConfig, event_rules: dict[str, dict[str, float | bool]], *, source_mode: str, evidence_root: str | Path = "outputs/incidents"):
         if source_mode not in {"full_ai", "cached_ai", "manual_demo"}:
             raise ValueError(f"unsupported source_mode: {source_mode}")
         self.camera = camera
         self.rules = event_rules
         self.source_mode = source_mode
+        self.evidence_root = evidence_root
         self.track_states = TrackStateManager()
         restricted = event_rules["restricted_zone_intrusion"]
         running = event_rules["person_running_on_track"]
@@ -117,6 +119,6 @@ class SafetyPipeline:
             duration_seconds=event.detected_timestamp_seconds - event.start_timestamp_seconds,
             detection_confidence=event.confidence,
             indicators=event.indicators,
-            evidence=evidence_paths(incident_id),
+            evidence=evidence_paths(incident_id, self.evidence_root),
             source_mode=self.source_mode,
         )
