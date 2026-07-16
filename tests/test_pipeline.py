@@ -66,6 +66,17 @@ class PipelineTests(unittest.TestCase):
         incidents = SafetyPipeline(self.camera, self.rules, source_mode="cached_ai").process_cached_frames(frames)
         self.assertNotIn("crowd_compression", {incident.incident_type for incident in incidents})
 
+    def test_crowd_motion_uses_median_to_ignore_one_moving_outlier(self):
+        frames = [
+            {"frame_index": 0, "timestamp_seconds": 0.0, "tracks": [track(10, 110, 10)]},
+            {"frame_index": 2, "timestamp_seconds": 2.0, "tracks": [track(10, 110, 10), track(11, 120, 10), track(12, 130, 10)]},
+            {"frame_index": 3, "timestamp_seconds": 3.0, "tracks": [track(10, 110, 10), track(11, 120, 10), track(12, 140, 10)]},
+        ]
+
+        incidents = SafetyPipeline(self.camera, self.rules, source_mode="cached_ai").process_cached_frames(frames)
+
+        self.assertIn("crowd_compression", {incident.incident_type for incident in incidents})
+
     def test_pose_track_detects_person_who_falls_then_remains_down(self):
         frames = [
             {"frame_index": 0, "timestamp_seconds": 0.0, "tracks": [], "pose_tracks": [pose_track(7, 210, 10, width=4, horizontal_score=0.1)]},

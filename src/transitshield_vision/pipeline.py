@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict, deque
 from pathlib import Path
+from statistics import median
 from typing import Any, Iterable
 
 from .config import CameraConfig
@@ -34,6 +35,7 @@ class SafetyPipeline:
         self._person_down_motion_window = float(down.get("motion_window_seconds", 0.75))
         self.crowd = CrowdCompressionDetector(float(crowd["minimum_density_ratio"]), float(crowd["minimum_density_growth"]), float(crowd["maximum_average_normalized_speed"]), float(crowd["minimum_duration_seconds"]), float(crowd["cooldown_seconds"]))
         self._crowd_growth_window = float(crowd.get("density_growth_window_seconds", 2.0))
+        self._crowd_motion_window = float(crowd.get("motion_window_seconds", 0.75))
         self._crowd_history: dict[str, deque[tuple[float, float]]] = defaultdict(deque)
         self._incident_sequence = 0
 
@@ -111,8 +113,8 @@ class SafetyPipeline:
                 eligible = [ratio for sample_time, ratio in history if sample_time <= target]
                 density_growth = density_ratio - eligible[-1] if eligible else 0.0
                 history.append((timestamp, density_ratio))
-                speeds = [states[item.track_id].normalized_speed for item in members]
-                average_speed = sum(speeds) / len(speeds) if speeds else 0.0
+                speeds = [states[item.track_id].normalized_speed_over(self._crowd_motion_window) for item in members]
+                average_speed = median(speeds) if speeds else 0.0
                 directions = [states[item.track_id].direction_vector for item in members if states[item.track_id].direction_vector != (0.0, 0.0)]
                 flow_consistency = None
                 if directions:

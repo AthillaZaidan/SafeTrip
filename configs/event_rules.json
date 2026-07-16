@@ -26,6 +26,7 @@
     "minimum_density_ratio": 0.85,
     "minimum_density_growth": 0.15,
     "density_growth_window_seconds": 2.0,
+    "motion_window_seconds": 0.75,
     "maximum_average_normalized_speed": 0.12,
     "maximum_flow_consistency": 0.45
   }
