@@ -1,7 +1,7 @@
 import unittest
 
 from transitshield_vision.schemas import TrackObservation, ZoneConfig
-from transitshield_vision.visualization import annotate_frame
+from transitshield_vision.visualization import AnnotatedVideoSink, annotate_frame
 
 
 class VisualizationTests(unittest.TestCase):
@@ -38,6 +38,42 @@ class VisualizationTests(unittest.TestCase):
         self.assertIn("box", CV2.calls)
         self.assertIn("footpoint", CV2.calls)
         self.assertGreaterEqual(CV2.calls.count("text"), 3)
+
+    def test_annotated_video_sink_opens_once_and_releases(self):
+        class Frame:
+            shape = (10, 20, 3)
+
+        class Writer:
+            def __init__(self):
+                self.frames = 0
+                self.released = False
+
+            def isOpened(self):
+                return True
+
+            def write(self, _frame):
+                self.frames += 1
+
+            def release(self):
+                self.released = True
+
+        writer = Writer()
+
+        class CV2:
+            @staticmethod
+            def VideoWriter(*_args):
+                return writer
+
+            @staticmethod
+            def VideoWriter_fourcc(*_args):
+                return 0
+
+        sink = AnnotatedVideoSink("annotated.mp4", fps=25, cv2_module=CV2)
+        sink.write(Frame())
+        sink.write(Frame())
+        sink.close()
+        self.assertEqual(writer.frames, 2)
+        self.assertTrue(writer.released)
 
 
 if __name__ == "__main__":

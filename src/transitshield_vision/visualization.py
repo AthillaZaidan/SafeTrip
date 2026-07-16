@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 from .schemas import TrackObservation, ZoneConfig
@@ -13,6 +14,37 @@ ZONE_COLORS = {
     "crowd_monitoring": (255, 170, 0),
     "track_area": (180, 0, 255),
 }
+
+
+class AnnotatedVideoSink:
+    def __init__(self, path: str | Path, *, fps: float, cv2_module: Any = None):
+        if fps <= 0:
+            raise ValueError("annotated video FPS must be positive")
+        if cv2_module is None:
+            try:
+                import cv2 as cv2_module
+            except ImportError as error:
+                raise RuntimeError("opencv-python is required for annotated video") from error
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.fps = fps
+        self.cv2 = cv2_module
+        self.writer = None
+
+    def write(self, frame: Any) -> None:
+        if self.writer is None:
+            height, width = frame.shape[:2]
+            self.writer = self.cv2.VideoWriter(self.path.as_posix(), self.cv2.VideoWriter_fourcc(*"mp4v"), self.fps, (width, height))
+            if not self.writer.isOpened():
+                self.writer.release()
+                self.writer = None
+                raise RuntimeError(f"failed to open annotated video writer: {self.path}")
+        self.writer.write(frame)
+
+    def close(self) -> None:
+        if self.writer is not None:
+            self.writer.release()
+            self.writer = None
 
 
 def annotate_frame(

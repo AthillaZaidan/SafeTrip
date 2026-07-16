@@ -15,6 +15,7 @@ from .pose import UltralyticsPoseEstimator, match_pose_scores
 from .schemas import EVENT_TYPES, Incident, validate_incident_payload
 from .tracker import UltralyticsByteTracker
 from .video_io import iter_video_frames
+from .visualization import AnnotatedVideoSink, annotate_frame
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,7 @@ def _run_tracking(
     runtime: RuntimeConfig,
     camera: CameraConfig,
     cache_path: Path,
+    annotated_path: Path,
     tracker: UltralyticsByteTracker | None,
     pose_estimator: UltralyticsPoseEstimator | None,
 ) -> tuple[list[dict[str, Any]], list[str]]:
@@ -48,38 +50,54 @@ def _run_tracking(
         except Exception as error:
             warnings.append(f"pose model disabled: {error}")
     frames: list[dict[str, Any]] = []
-    for video_frame in iter_video_frames(
-        camera.video_path,
-        runtime.frame_stride,
-        runtime.max_frames,
-        fps_override=camera.fps_override,
-    ):
-        tracks = tracker.track(video_frame.raw_bgr_frame, frame_index=video_frame.frame_index, timestamp_seconds=video_frame.timestamp_seconds)
-        pose_scores: dict[int, float] = {}
-        if pose_estimator is not None:
-            try:
-                poses = pose_estimator.estimate(video_frame.raw_bgr_frame)
-                pose_scores = match_pose_scores(tracks, [(pose.bbox_xyxy, pose.horizontal_score) for pose in poses if pose.horizontal_score is not None])
-            except Exception as error:
-                warnings.append(f"pose inference disabled at frame {video_frame.frame_index}: {error}")
-                pose_estimator = None
-        frames.append(
-            {
-                "frame_index": video_frame.frame_index,
-                "timestamp_seconds": video_frame.timestamp_seconds,
-                "fps": video_frame.fps,
-                "pose_scores": {str(track_id): score for track_id, score in pose_scores.items()},
-                "tracks": [
-                    {
-                        "track_id": item.track_id,
-                        "confidence": item.confidence,
-                        "bbox_xyxy": list(item.bbox_xyxy),
-                        "footpoint_xy": list(item.footpoint_xy),
-                    }
-                    for item in tracks
-                ],
-            }
-        )
+    sink: AnnotatedVideoSink | None = None
+    annotation_disabled = not runtime.save_annotated_video
+    try:
+        for video_frame in iter_video_frames(
+            camera.video_path,
+            runtime.frame_stride,
+            runtime.max_frames,
+            fps_override=camera.fps_override,
+        ):
+            tracks = tracker.track(video_frame.raw_bgr_frame, frame_index=video_frame.frame_index, timestamp_seconds=video_frame.timestamp_seconds)
+            pose_scores: dict[int, float] = {}
+            if pose_estimator is not None:
+                try:
+                    poses = pose_estimator.estimate(video_frame.raw_bgr_frame)
+                    pose_scores = match_pose_scores(tracks, [(pose.bbox_xyxy, pose.horizontal_score) for pose in poses if pose.horizontal_score is not None])
+                except Exception as error:
+                    warnings.append(f"pose inference disabled at frame {video_frame.frame_index}: {error}")
+                    pose_estimator = None
+            if not annotation_disabled:
+                try:
+                    sink = sink or AnnotatedVideoSink(annotated_path, fps=video_frame.fps)
+                    sink.write(annotate_frame(video_frame.raw_bgr_frame, camera.zones, tracks))
+                except Exception as error:
+                    warnings.append(f"annotated video disabled: {error}")
+                    annotation_disabled = True
+                    if sink is not None:
+                        sink.close()
+                        sink = None
+            frames.append(
+                {
+                    "frame_index": video_frame.frame_index,
+                    "timestamp_seconds": video_frame.timestamp_seconds,
+                    "fps": video_frame.fps,
+                    "pose_scores": {str(track_id): score for track_id, score in pose_scores.items()},
+                    "tracks": [
+                        {
+                            "track_id": item.track_id,
+                            "confidence": item.confidence,
+                            "bbox_xyxy": list(item.bbox_xyxy),
+                            "footpoint_xy": list(item.footpoint_xy),
+                        }
+                        for item in tracks
+                    ],
+                }
+            )
+    finally:
+        if sink is not None:
+            sink.close()
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     cache_path.write_text("".join(json.dumps(frame, sort_keys=True) + "\n" for frame in frames), encoding="utf-8")
     tracker.reset()
@@ -103,11 +121,12 @@ def run_pipeline(
     output_root = Path(output_root)
     video_id = Path(camera.video_path).stem
     default_cache = output_root / "frame-events" / f"{video_id}_tracks.jsonl"
+    annotated_path = output_root / "annotated-videos" / f"{video_id}_annotated.mp4"
     frames: list[dict[str, Any]] = []
     warnings: list[str] = []
 
     if mode == "full_ai":
-        frames, warnings = _run_tracking(runtime, camera, default_cache, tracker, pose_estimator)
+        frames, warnings = _run_tracking(runtime, camera, default_cache, annotated_path, tracker, pose_estimator)
         incidents = SafetyPipeline(camera, event_rules, source_mode=mode).process_cached_frames(frames)
         evidence_generator = evidence_generator or generate_evidence_for_incident
         for incident in incidents:
@@ -155,5 +174,6 @@ def run_pipeline(
             "incidents": incidents_path.as_posix(),
             "pipeline_summary": summary_path.as_posix(),
             "track_cache": (Path(cache_path) if cache_path is not None else default_cache).as_posix(),
+            "annotated_video": annotated_path.as_posix() if runtime.save_annotated_video and mode == "full_ai" else None,
         },
     )
