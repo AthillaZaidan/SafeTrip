@@ -30,7 +30,6 @@ class PipelineTests(unittest.TestCase):
                 "video_path": "demo.mp4",
                 "zones": [
                     {"zone_id": "RESTRICTED", "zone_type": "restricted", "polygon": [[0, 0], [10, 0], [10, 20], [0, 20]], "danger_direction": [1, 0]},
-                    {"zone_id": "TRACK", "zone_type": "track_area", "polygon": [[20, 0], [80, 0], [80, 20], [20, 20]]},
                     {"zone_id": "CROWD", "zone_type": "crowd_monitoring", "polygon": [[100, 0], [150, 0], [150, 20], [100, 20]], "capacity": 2},
                     {"zone_id": "NORMAL", "zone_type": "normal", "polygon": [[180, 0], [250, 0], [250, 20], [180, 20]]},
                 ],
@@ -40,13 +39,12 @@ class PipelineTests(unittest.TestCase):
         self.rules = parse_event_rules(
             {
                 "restricted_zone_intrusion": {"minimum_duration_seconds": 1, "cooldown_seconds": 5, "danger_direction_cosine_threshold": 0.5},
-                "person_running_on_track": {"minimum_duration_seconds": 0.5, "cooldown_seconds": 5, "minimum_normalized_speed": 0.9},
                 "possible_person_down": {"minimum_duration_seconds": 1, "cooldown_seconds": 5, "minimum_aspect_ratio": 1.1, "maximum_normalized_speed": 0.08, "minimum_pose_horizontal_score": 0.65},
                 "crowd_compression": {"minimum_duration_seconds": 1, "cooldown_seconds": 5, "minimum_density_ratio": 0.85, "minimum_density_growth": 0.4, "maximum_average_normalized_speed": 0.12, "density_growth_window_seconds": 2},
             }
         )
 
-    def test_cached_tracks_produce_four_explainable_incidents(self):
+    def test_cached_tracks_produce_three_explainable_incidents(self):
         frames = [
             {"frame_index": 0, "timestamp_seconds": 0.0, "tracks": [track(1, 5, 10), track(2, 25, 10), track(3, 210, 10, 14, 10), track(10, 110, 10)]},
             {"frame_index": 1, "timestamp_seconds": 1.0, "tracks": [track(1, 5, 10), track(2, 35, 10), track(3, 210, 10, 14, 10), track(10, 110, 10)]},
@@ -54,8 +52,8 @@ class PipelineTests(unittest.TestCase):
             {"frame_index": 3, "timestamp_seconds": 3.0, "tracks": [track(1, 5, 10), track(2, 55, 10), track(3, 210, 10, 14, 10), track(10, 110, 10), track(11, 120, 10)]},
         ]
         incidents = SafetyPipeline(self.camera, self.rules, source_mode="cached_ai").process_cached_frames(frames)
-        self.assertEqual({incident.incident_type for incident in incidents}, {"restricted_zone_intrusion", "person_running_on_track", "possible_person_down", "crowd_compression"})
-        self.assertEqual(len({incident.incident_id for incident in incidents}), 4)
+        self.assertEqual({incident.incident_type for incident in incidents}, {"restricted_zone_intrusion", "possible_person_down", "crowd_compression"})
+        self.assertEqual(len({incident.incident_id for incident in incidents}), 3)
 
     def test_crowd_growth_does_not_use_stale_video_start_baseline(self):
         frames = [
@@ -88,6 +86,25 @@ class PipelineTests(unittest.TestCase):
 
         self.assertEqual([incident.incident_type for incident in incidents], ["possible_person_down"])
         self.assertEqual(incidents[0].entity_ids, ["pose_track:7"])
+        self.assertEqual(incidents[0].zone_id, "NORMAL")
+
+    def test_switching_to_pose_mode_closes_regular_person_down_incident(self):
+        frames = [
+            {"frame_index": 0, "timestamp_seconds": 0.0, "tracks": [track(7, 210, 10, width=14)]},
+            {"frame_index": 1, "timestamp_seconds": 1.0, "tracks": [track(7, 210, 10, width=14)]},
+            {
+                "frame_index": 2,
+                "timestamp_seconds": 2.0,
+                "tracks": [track(7, 210, 10, width=14)],
+                "pose_tracks": [pose_track(70, 210, 10, width=4, horizontal_score=0.1)],
+            },
+        ]
+
+        incidents = SafetyPipeline(self.camera, self.rules, source_mode="cached_ai").process_cached_frames(frames)
+        incident = next(item for item in incidents if item.entity_ids == ["track:7"])
+
+        self.assertEqual(incident.timestamp_end_seconds, 2.0)
+        self.assertEqual(incident.duration_seconds, 2.0)
 
     def test_pose_track_detects_person_already_down_on_first_frame(self):
         frames = [
@@ -126,6 +143,34 @@ class PipelineTests(unittest.TestCase):
             path = Path(directory) / "tracks.jsonl"
             path.write_text('{"frame_index": 0, "timestamp_seconds": 0, "tracks": []}\n', encoding="utf-8")
             self.assertEqual(load_cached_frames(path)[0]["frame_index"], 0)
+
+    def test_incident_keeps_zero_start_and_closes_on_condition_exit(self):
+        frames = [
+            {"frame_index": 0, "timestamp_seconds": 0.0, "tracks": [track(1, 5, 10)]},
+            {"frame_index": 1, "timestamp_seconds": 1.0, "tracks": [track(1, 5, 10)]},
+            {"frame_index": 2, "timestamp_seconds": 2.0, "tracks": [track(1, 15, 10)]},
+        ]
+
+        incidents = SafetyPipeline(self.camera, self.rules, source_mode="cached_ai").process_cached_frames(frames)
+        incident = next(item for item in incidents if item.incident_type == "restricted_zone_intrusion")
+
+        self.assertEqual(incident.timestamp_start_seconds, 0.0)
+        self.assertEqual(incident.timestamp_detected_seconds, 1.0)
+        self.assertEqual(incident.timestamp_end_seconds, 2.0)
+        self.assertEqual(incident.duration_seconds, 2.0)
+
+    def test_long_detection_gap_does_not_confirm_old_candidate(self):
+        frames = [
+            {"frame_index": 0, "timestamp_seconds": 0.0, "tracks": [track(1, 5, 10)]},
+            {"frame_index": 1, "timestamp_seconds": 1.0, "tracks": []},
+            {"frame_index": 2, "timestamp_seconds": 2.0, "tracks": []},
+            {"frame_index": 3, "timestamp_seconds": 3.0, "tracks": []},
+            {"frame_index": 4, "timestamp_seconds": 4.0, "tracks": [track(1, 5, 10)]},
+        ]
+
+        incidents = SafetyPipeline(self.camera, self.rules, source_mode="cached_ai").process_cached_frames(frames)
+
+        self.assertNotIn("restricted_zone_intrusion", {item.incident_type for item in incidents})
 
 
 if __name__ == "__main__":

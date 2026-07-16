@@ -6,17 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .schemas import ZoneConfig
+from .schemas import EVENT_TYPES, ZoneConfig
 
 
 EXECUTION_MODES = {"full_ai", "cached_ai", "manual_demo"}
-ZONE_TYPES = {"normal", "limited_dwell", "restricted", "crowd_monitoring", "track_area"}
-EVENT_TYPES = {
-    "restricted_zone_intrusion",
-    "possible_person_down",
-    "crowd_compression",
-    "person_running_on_track",
-}
+ZONE_TYPES = {"normal", "limited_dwell", "restricted", "crowd_monitoring"}
 
 
 @dataclass(frozen=True)
@@ -25,14 +19,11 @@ class RuntimeConfig:
     device: str = "auto"
     frame_stride: int = 1
     max_frames: int | None = None
-    person_class_id: int = 0
     person_confidence_threshold: float = 0.35
     detector_image_size: int = 640
-    tracker: str = "bytetrack"
     detector_weights: str = "yolo11n.pt"
     pose_weights: str | None = "yolo11n-pose.pt"
     save_annotated_video: bool = True
-    save_frame_events: bool = True
     random_seed: int = 42
 
 
@@ -42,6 +33,7 @@ class CameraConfig:
     name: str
     video_path: str
     fps_override: float | None
+    enabled_events: tuple[str, ...]
     zones: tuple[ZoneConfig, ...]
 
 
@@ -80,6 +72,9 @@ def parse_camera_config(data: dict[str, Any], *, require_video: bool = True) -> 
         raise ValueError("video_path is required")
     if require_video and not Path(video_path).is_file():
         raise ValueError(f"video_path does not exist: {video_path}")
+    enabled_events = tuple(data.get("enabled_events", EVENT_TYPES))
+    if not enabled_events or len(set(enabled_events)) != len(enabled_events) or not set(enabled_events) <= set(EVENT_TYPES):
+        raise ValueError(f"enabled_events must be unique values from {list(EVENT_TYPES)}")
 
     zones: list[ZoneConfig] = []
     seen: set[str] = set()
@@ -119,12 +114,13 @@ def parse_camera_config(data: dict[str, Any], *, require_video: bool = True) -> 
         name=str(data.get("name", camera_id)),
         video_path=video_path,
         fps_override=None if fps_override is None else float(fps_override),
+        enabled_events=enabled_events,
         zones=tuple(zones),
     )
 
 
 def parse_event_rules(data: dict[str, Any]) -> dict[str, dict[str, float | bool]]:
-    if set(data) != EVENT_TYPES:
+    if set(data) != set(EVENT_TYPES):
         raise ValueError(f"event rules must contain exactly {sorted(EVENT_TYPES)}")
     parsed: dict[str, dict[str, float | bool]] = {}
     for event_type, raw in data.items():

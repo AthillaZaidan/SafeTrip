@@ -3,6 +3,7 @@
   "name": "Platform B Camera 01",
   "video_path": "data/demo-videos/platform_b_demo.mp4",
   "fps_override": null,
+  "enabled_events": ["restricted_zone_intrusion"],
   "zones": [
     {
       "zone_id": "ZONE_TRACK_BOUNDARY",
@@ -11,14 +12,6 @@
       "capacity": null,
       "risk_multiplier": 1.5,
       "danger_direction": [0.0, 1.0]
-    },
-    {
-      "zone_id": "ZONE_RAILWAY_TRACK",
-      "zone_type": "track_area",
-      "polygon": [[55, 365], [585, 365], [625, 475], [15, 475]],
-      "capacity": null,
-      "risk_multiplier": 1.8,
-      "danger_direction": null
     },
     {
       "zone_id": "ZONE_GATE_QUEUE",

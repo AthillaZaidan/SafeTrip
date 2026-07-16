@@ -49,9 +49,9 @@ class VisualizationTests(unittest.TestCase):
             def putText(cls, *args, **kwargs):
                 cls.calls.append("text")
 
-        zone = ZoneConfig("TRACK", "CAM", "track_area", ((0, 0), (10, 0), (10, 10), (0, 10)))
+        zone = ZoneConfig("RESTRICTED", "CAM", "restricted", ((0, 0), (10, 0), (10, 10), (0, 10)))
         track = TrackObservation(0, 0, 1, 0.9, (1, 1, 5, 9), (3, 9), 4, 8)
-        annotate_frame(Frame(), [zone], [track], ["person_running_on_track"], cv2_module=CV2)
+        annotate_frame(Frame(), [zone], [track], ["restricted_zone_intrusion"], cv2_module=CV2)
         self.assertIn("zone", CV2.calls)
         self.assertIn("box", CV2.calls)
         self.assertIn("footpoint", CV2.calls)
@@ -93,7 +93,7 @@ class VisualizationTests(unittest.TestCase):
         self.assertEqual(writer.frames, 2)
         self.assertTrue(writer.released)
 
-    def test_annotation_labels_all_people_and_four_event_reasons(self):
+    def test_annotation_labels_all_people_and_three_event_reasons(self):
         class Frame:
             def copy(self):
                 return self
@@ -129,7 +129,6 @@ class VisualizationTests(unittest.TestCase):
         pose_tracks = [TrackObservation(0, 2, 7, 0.88, (60, 1, 72, 8), (66, 8), 12, 7)]
         incidents = [
             incident("I1", "restricted_zone_intrusion", entities=["track:2"], indicators={"restricted_dwell_seconds": 1.5}),
-            incident("I2", "person_running_on_track", entities=["track:2"], indicators={"normalized_speed": 1.24}),
             incident("I3", "possible_person_down", entities=["pose_track:7"], indicators={"horizontal_body_score": 0.99, "low_motion_seconds": 3.0}),
             incident("I4", "crowd_compression", zone_id="CROWD", indicators={"people_count": 20, "configured_capacity": 18}),
         ]
@@ -143,7 +142,6 @@ class VisualizationTests(unittest.TestCase):
         self.assertIn((0, 0, 255), CV2.rectangles)
         self.assertIn("Person #3 | 0.93", labels)
         self.assertIn("RESTRICTED INTRUSION | dwell 1.5s", labels)
-        self.assertIn("RUNNING ON TRACK | speed 1.24", labels)
         self.assertIn("POSSIBLE DOWN | pose 0.99 | still 3.0s", labels)
         self.assertIn("CROWD COMPRESSION | 20/18 people", labels)
 

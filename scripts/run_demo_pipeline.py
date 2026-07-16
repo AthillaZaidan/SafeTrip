@@ -15,6 +15,7 @@ from transitshield_vision.runner import run_pipeline
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the TransitShield prerecorded-video safety pipeline.")
     parser.add_argument("--runtime-config", default="configs/runtime.json")
+    parser.add_argument("--execution-mode", choices=("full_ai", "cached_ai", "manual_demo"))
     parser.add_argument("--camera-config", default="configs/cameras/demo_camera.json")
     parser.add_argument("--event-rules", default="configs/event_rules.json")
     parser.add_argument("--output-root", default="outputs")
@@ -22,7 +23,10 @@ def main() -> None:
     parser.add_argument("--manual-path")
     args = parser.parse_args()
 
-    runtime = parse_runtime_config(load_json(args.runtime_config))
+    runtime_data = load_json(args.runtime_config)
+    if args.execution_mode is not None:
+        runtime_data["execution_mode"] = args.execution_mode
+    runtime = parse_runtime_config(runtime_data)
     camera = parse_camera_config(load_json(args.camera_config), require_video=runtime.execution_mode == "full_ai")
     rules = parse_event_rules(load_json(args.event_rules))
     set_deterministic_seed(runtime.random_seed)

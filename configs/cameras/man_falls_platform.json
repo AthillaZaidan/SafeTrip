@@ -3,6 +3,7 @@
   "name": "Man Falls Platform Demo",
   "video_path": "data/demo-videos/Man_falls_on_railway_platform_202607162215.mp4",
   "fps_override": null,
+  "enabled_events": ["possible_person_down"],
   "zones": [
     {
       "zone_id": "ZONE_TRACK_BOUNDARY",
@@ -11,14 +12,6 @@
       "capacity": null,
       "risk_multiplier": 1.5,
       "danger_direction": [0.0, 1.0]
-    },
-    {
-      "zone_id": "ZONE_RAILWAY_TRACK",
-      "zone_type": "track_area",
-      "polygon": [[110, 548], [1170, 548], [1250, 713], [30, 713]],
-      "capacity": null,
-      "risk_multiplier": 1.8,
-      "danger_direction": null
     },
     {
       "zone_id": "ZONE_GATE_QUEUE",

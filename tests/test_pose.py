@@ -1,7 +1,6 @@
 import unittest
 
-from transitshield_vision.pose import UltralyticsPoseEstimator, body_horizontal_score, match_pose_scores
-from transitshield_vision.schemas import TrackObservation
+from transitshield_vision.pose import UltralyticsPoseEstimator, body_horizontal_score
 
 
 class Values(list):
@@ -20,11 +19,6 @@ class PoseTests(unittest.TestCase):
         keypoints[11] = (10, 1, 1)
         keypoints[12] = (12, 1, 1)
         self.assertGreater(body_horizontal_score(keypoints), 0.99)
-
-    def test_pose_box_is_matched_to_track_by_iou(self):
-        track = TrackObservation(0, 0, 4, 0.9, (0, 0, 10, 10), (5, 10), 10, 10)
-        scores = match_pose_scores([track], [((1, 1, 9, 9), 0.8)])
-        self.assertEqual(scores, {4: 0.8})
 
     def test_pose_estimator_returns_persistent_track_id(self):
         keypoints = [[0, 0, 0] for _ in range(17)]

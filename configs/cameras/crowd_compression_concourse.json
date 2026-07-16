@@ -3,12 +3,13 @@
   "name": "Concourse Crowd Compression Demo",
   "video_path": "data/demo-videos/Crowd_compression_incident_railw…_202607170045.mp4",
   "fps_override": null,
+  "enabled_events": ["crowd_compression"],
   "zones": [
     {
       "zone_id": "ZONE_CONCOURSE_CROWD",
       "zone_type": "crowd_monitoring",
       "polygon": [[335, 205], [945, 205], [1120, 610], [130, 610]],
-      "capacity": 30,
+      "capacity": 10,
       "risk_multiplier": 1.5,
       "danger_direction": null
     },

@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from transitshield_vision.evaluation import GroundTruthEvent, evaluate_by_event_type, evaluate_events, temporal_iou
-from transitshield_vision.evidence import EvidenceFrame, evidence_paths, write_evidence
+from transitshield_vision.evidence import EvidenceFrame, evidence_paths, write_evidence, write_metadata_only
 from transitshield_vision.incident_export import write_incidents
 from transitshield_vision.schemas import Incident
 
@@ -36,6 +36,26 @@ class SchemaAndEvaluationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 write_incidents([{"incident_type": "unknown"}], path)
             self.assertFalse(path.exists())
+
+    def test_incident_rejects_impossible_lifecycle(self):
+        incident = Incident(
+            "INC_CAM_000001", "restricted_zone_intrusion", "CAM", "R", ["track:1"],
+            10, 11, 2, 0, 0.9, {},
+            {"snapshot_raw": None, "snapshot_annotated": None, "clip": None, "metadata": None}, "manual_demo",
+        )
+
+        with self.assertRaisesRegex(ValueError, "end timestamp"):
+            incident.validate()
+
+    def test_incident_rejects_duration_inconsistent_with_timestamps(self):
+        incident = Incident(
+            "INC_CAM_000001", "restricted_zone_intrusion", "CAM", "R", ["track:1"],
+            1, 2, 5, 1, 0.9, {},
+            {"snapshot_raw": None, "snapshot_annotated": None, "clip": None, "metadata": None}, "manual_demo",
+        )
+
+        with self.assertRaisesRegex(ValueError, "duration_seconds"):
+            incident.validate()
 
     def test_evidence_paths_are_deterministic_and_relative(self):
         paths = evidence_paths("INC_CAM_000001")
@@ -74,7 +94,7 @@ class SchemaAndEvaluationTests(unittest.TestCase):
                 return 0
 
         incident = Incident(
-            "INC_CAM_000001", "person_running_on_track", "CAM", "TRACK", ["track:1"],
+            "INC_CAM_000001", "restricted_zone_intrusion", "CAM", "TRACK", ["track:1"],
             1, 2, None, 1, 0.9, {"normalized_speed": 1.2},
             {"snapshot_raw": None, "snapshot_annotated": None, "clip": None, "metadata": None}, "full_ai",
         )
@@ -89,6 +109,20 @@ class SchemaAndEvaluationTests(unittest.TestCase):
             self.assertTrue(all(Path(path).is_file() for path in paths.values()))
             metadata = json.loads(Path(paths["metadata"]).read_text(encoding="utf-8"))
             self.assertEqual(metadata["incident_id"], "INC_CAM_000001")
+
+    def test_metadata_only_marks_unavailable_media_as_none(self):
+        incident = Incident(
+            "INC_CAM_000001", "restricted_zone_intrusion", "CAM", "R", ["track:1"],
+            0, 1, 2, 2, 0.9, {},
+            {"snapshot_raw": None, "snapshot_annotated": None, "clip": None, "metadata": None}, "cached_ai",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            paths = write_metadata_only(incident, root=directory)
+
+            self.assertTrue(Path(paths["metadata"]).is_file())
+            self.assertIsNone(paths["snapshot_raw"])
+            self.assertIsNone(paths["snapshot_annotated"])
+            self.assertIsNone(paths["clip"])
 
     def test_temporal_iou_and_false_alert_count_by_event(self):
         self.assertAlmostEqual(temporal_iou(0, 4, 2, 6), 2 / 6)
@@ -106,7 +140,7 @@ class SchemaAndEvaluationTests(unittest.TestCase):
         metrics = evaluate_by_event_type([], [], duration_hours=1.0)
         self.assertEqual(
             set(metrics),
-            {"restricted_zone_intrusion", "person_running_on_track", "possible_person_down", "crowd_compression"},
+            {"restricted_zone_intrusion", "possible_person_down", "crowd_compression"},
         )
 
 

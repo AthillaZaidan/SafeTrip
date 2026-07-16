@@ -3,6 +3,7 @@
   "name": "Passengers Queuing at Boarding Gate Demo",
   "video_path": "data/demo-videos/Passengers_queuing_at_boarding_gate_202607162359.mp4",
   "fps_override": null,
+  "enabled_events": ["crowd_compression"],
   "zones": [
     {
       "zone_id": "ZONE_BOARDING_GATE_QUEUE",

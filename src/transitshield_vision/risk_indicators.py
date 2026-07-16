@@ -38,10 +38,6 @@ def score_indicators(event_type: str, indicators: dict) -> RiskResult:
         add(bool(indicators.get("inside_restricted_zone")), "inside_restricted_zone", 30, "Person is inside a configured restricted zone")
         add(float(indicators.get("restricted_dwell_seconds", 0)) >= 3, "restricted_dwell_seconds", 20, "Restricted-zone dwell reached three seconds")
         add(bool(indicators.get("moving_toward_danger")), "moving_toward_danger", 30, "Movement aligns with the configured danger direction")
-    elif event_type == "person_running_on_track":
-        add(bool(indicators.get("inside_track_area")), "inside_track_area", 40, "Person is inside a railway or vehicle track area")
-        add(float(indicators.get("normalized_speed", 0)) >= 1.0, "normalized_speed", 25, "Normalized movement speed is consistent with running")
-        add(float(indicators.get("running_duration_seconds", 0)) >= 0.5, "running_duration_seconds", 15, "Running condition persisted beyond the debounce threshold")
     elif event_type == "possible_person_down":
         add(float(indicators.get("bbox_aspect_ratio", 0)) >= 1.1, "bbox_aspect_ratio", 25, "Body geometry is horizontal")
         add(float(indicators.get("normalized_speed", 1)) <= 0.08, "normalized_speed", 25, "Movement is low")

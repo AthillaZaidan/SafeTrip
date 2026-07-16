@@ -7,12 +7,12 @@ from statistics import median
 from typing import Any, Iterable
 
 from .config import CameraConfig
-from .event_detectors import CrowdCompressionDetector, PersonDownDetector, RestrictedIntrusionDetector, RunningOnTrackDetector
+from .event_detectors import CrowdCompressionDetector, PersonDownDetector, RestrictedIntrusionDetector
 from .evidence import evidence_paths
 from .geometry import bbox_footpoint, point_in_polygon
-from .schemas import ConfirmedEvent, Incident, TrackObservation
+from .schemas import ClosedEvent, ConfirmedEvent, Incident, TrackObservation
 from .track_state import TrackStateManager
-from .zone_analysis import calculate_direction_alignment
+from .zone_analysis import calculate_direction_alignment, get_active_zone
 
 
 class SafetyPipeline:
@@ -26,18 +26,17 @@ class SafetyPipeline:
         self.track_states = TrackStateManager()
         self.pose_track_states = TrackStateManager()
         restricted = event_rules["restricted_zone_intrusion"]
-        running = event_rules["person_running_on_track"]
         down = event_rules["possible_person_down"]
         crowd = event_rules["crowd_compression"]
-        self.restricted = RestrictedIntrusionDetector(float(restricted["minimum_duration_seconds"]), float(restricted["cooldown_seconds"]), float(restricted.get("danger_direction_cosine_threshold", 0.5)))
-        self.running = RunningOnTrackDetector(float(running["minimum_normalized_speed"]), float(running["minimum_duration_seconds"]), float(running["cooldown_seconds"]))
-        self.person_down = PersonDownDetector(float(down["minimum_aspect_ratio"]), float(down["maximum_normalized_speed"]), float(down["minimum_duration_seconds"]), float(down["cooldown_seconds"]), float(down.get("minimum_pose_horizontal_score", 0.65)))
+        self.restricted = RestrictedIntrusionDetector(float(restricted["minimum_duration_seconds"]), float(restricted["cooldown_seconds"]), float(restricted.get("danger_direction_cosine_threshold", 0.5))) if "restricted_zone_intrusion" in camera.enabled_events else None
+        self.person_down = PersonDownDetector(float(down["minimum_aspect_ratio"]), float(down["maximum_normalized_speed"]), float(down["minimum_duration_seconds"]), float(down["cooldown_seconds"]), float(down.get("minimum_pose_horizontal_score", 0.65))) if "possible_person_down" in camera.enabled_events else None
         self._person_down_motion_window = float(down.get("motion_window_seconds", 0.75))
-        self.crowd = CrowdCompressionDetector(float(crowd["minimum_density_ratio"]), float(crowd["minimum_density_growth"]), float(crowd["maximum_average_normalized_speed"]), float(crowd["minimum_duration_seconds"]), float(crowd["cooldown_seconds"]))
+        self.crowd = CrowdCompressionDetector(float(crowd["minimum_density_ratio"]), float(crowd["minimum_density_growth"]), float(crowd["maximum_average_normalized_speed"]), float(crowd["minimum_duration_seconds"]), float(crowd["cooldown_seconds"])) if "crowd_compression" in camera.enabled_events else None
         self._crowd_growth_window = float(crowd.get("density_growth_window_seconds", 2.0))
         self._crowd_motion_window = float(crowd.get("motion_window_seconds", 0.75))
         self._crowd_history: dict[str, deque[tuple[float, float]]] = defaultdict(deque)
         self._incident_sequence = 0
+        self._active_incidents: dict[str, Incident] = {}
 
     def _observation(self, raw: dict[str, Any], frame_index: int, timestamp: float) -> TrackObservation:
         bbox = tuple(float(value) for value in raw["bbox_xyxy"])
@@ -55,38 +54,54 @@ class SafetyPipeline:
     def process_cached_frames(self, frames: Iterable[dict[str, Any]]) -> list[Incident]:
         incidents: list[Incident] = []
         restricted_zones = [zone for zone in self.camera.zones if zone.zone_type == "restricted"]
-        track_zones = [zone for zone in self.camera.zones if zone.zone_type == "track_area"]
         crowd_zones = [zone for zone in self.camera.zones if zone.zone_type == "crowd_monitoring"]
 
         for frame in frames:
             frame_index = int(frame["frame_index"])
             timestamp = float(frame["timestamp_seconds"])
             observations = [self._observation(raw, frame_index, timestamp) for raw in frame.get("tracks", [])]
+            updates: list[ConfirmedEvent | ClosedEvent] = []
+            for stale in self.track_states.remove_missing({item.track_id for item in observations}):
+                if self.restricted:
+                    for zone in restricted_zones:
+                        closed = self.restricted.close(self.camera.camera_id, zone.zone_id, stale.track_id, timestamp)
+                        if closed:
+                            updates.append(closed)
+                if self.person_down:
+                    closed = self.person_down.close(self.camera.camera_id, stale.track_id, timestamp)
+                    if closed:
+                        updates.append(closed)
             states = {observation.track_id: self.track_states.update(observation) for observation in observations}
             pose_tracking = "pose_tracks" in frame
             pose_observations = [self._observation(raw, frame_index, timestamp) for raw in frame.get("pose_tracks", [])]
+            for stale in self.pose_track_states.remove_missing({item.track_id for item in pose_observations}):
+                if self.person_down:
+                    closed = self.person_down.close(self.camera.camera_id, stale.track_id, timestamp, entity_prefix="pose_track")
+                    if closed:
+                        updates.append(closed)
             pose_states = {observation.track_id: self.pose_track_states.update(observation) for observation in pose_observations}
-            events: list[ConfirmedEvent] = []
 
             for observation in observations:
                 state = states[observation.track_id]
-                for zone in restricted_zones:
-                    inside = point_in_polygon(observation.footpoint_xy, zone.polygon)
-                    event = self.restricted.update(self.camera.camera_id, zone.zone_id, observation.track_id, timestamp, inside, calculate_direction_alignment(state, zone.danger_direction), observation.confidence)
+                if self.restricted:
+                    for zone in restricted_zones:
+                        inside = point_in_polygon(observation.footpoint_xy, zone.polygon)
+                        event = self.restricted.update(self.camera.camera_id, zone.zone_id, observation.track_id, timestamp, inside, calculate_direction_alignment(state, zone.danger_direction), observation.confidence)
+                        if event:
+                            updates.append(event)
+                if self.person_down:
+                    if pose_tracking:
+                        event = self.person_down.close(self.camera.camera_id, observation.track_id, timestamp)
+                    else:
+                        aspect_ratio = observation.bbox_width / max(observation.bbox_height, 1.0)
+                        zone = get_active_zone(observation.footpoint_xy, self.camera.zones)
+                        event = self.person_down.update(self.camera.camera_id, observation.track_id, timestamp, aspect_ratio, state.normalized_speed, None, observation.confidence, None if zone is None else zone.zone_id)
                     if event:
-                        events.append(event)
-                for zone in track_zones:
-                    inside = point_in_polygon(observation.footpoint_xy, zone.polygon)
-                    event = self.running.update(self.camera.camera_id, zone.zone_id, observation.track_id, timestamp, inside, state.normalized_speed, observation.confidence, state.direction_vector)
-                    if event:
-                        events.append(event)
-                if not pose_tracking:
-                    aspect_ratio = observation.bbox_width / max(observation.bbox_height, 1.0)
-                    event = self.person_down.update(self.camera.camera_id, observation.track_id, timestamp, aspect_ratio, state.normalized_speed, frame.get("pose_scores", {}).get(str(observation.track_id)), observation.confidence)
-                    if event:
-                        events.append(event)
+                        updates.append(event)
 
             for raw, observation in zip(frame.get("pose_tracks", []), pose_observations, strict=True):
+                if not self.person_down:
+                    break
                 state = pose_states[observation.track_id]
                 aspect_ratio = observation.bbox_width / max(observation.bbox_height, 1.0)
                 event = self.person_down.update(
@@ -97,12 +112,13 @@ class SafetyPipeline:
                     state.normalized_speed_over(self._person_down_motion_window),
                     raw.get("horizontal_score"),
                     observation.confidence,
+                    None if (zone := get_active_zone(observation.footpoint_xy, self.camera.zones)) is None else zone.zone_id,
                     entity_prefix="pose_track",
                 )
                 if event:
-                    events.append(event)
+                    updates.append(event)
 
-            for zone in crowd_zones:
+            for zone in crowd_zones if self.crowd else []:
                 members = [observation for observation in observations if point_in_polygon(observation.footpoint_xy, zone.polygon)]
                 density_ratio = len(members) / max(zone.capacity or 1, 1)
                 history = self._crowd_history[zone.zone_id]
@@ -119,13 +135,21 @@ class SafetyPipeline:
                 flow_consistency = None
                 if directions:
                     flow_consistency = ((sum(x for x, _ in directions) / len(directions)) ** 2 + (sum(y for _, y in directions) / len(directions)) ** 2) ** 0.5
-                event = self.crowd.update(self.camera.camera_id, zone.zone_id, timestamp, len(members), zone.capacity or 1, density_growth, average_speed, flow_consistency)
+                detection_confidence = median(item.confidence for item in members) if members else 0.0
+                event = self.crowd.update(self.camera.camera_id, zone.zone_id, timestamp, len(members), zone.capacity or 1, density_growth, average_speed, flow_consistency, detection_confidence)
                 if event:
-                    events.append(event)
+                    updates.append(event)
 
-            incidents.extend(self._incident(event) for event in events)
-            self.track_states.remove_stale(frame_index)
-            self.pose_track_states.remove_stale(frame_index)
+            for update in updates:
+                if isinstance(update, ConfirmedEvent):
+                    incident = self._incident(update)
+                    incidents.append(incident)
+                    self._active_incidents[update.entity_key] = incident
+                else:
+                    incident = self._active_incidents.pop(update.entity_key, None)
+                    if incident is not None:
+                        incident.timestamp_end_seconds = update.timestamp_seconds
+                        incident.duration_seconds = update.timestamp_seconds - incident.timestamp_start_seconds
         return incidents
 
     def _incident(self, event: ConfirmedEvent) -> Incident:
