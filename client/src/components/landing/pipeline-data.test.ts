@@ -20,8 +20,13 @@ describe("Feature 1 landing pipeline", () => {
     expect(pipelineApi).not.toBeNull();
     expect(pipelineApi!.pipelineClips).toHaveLength(3);
 
+    expect(pipelineApi!.pipelineClips.map((clip) => clip.src)).toEqual([
+      "/videos/feature-1-processed/dense-platform-crowd.mp4",
+      "/videos/feature-1-processed/passenger-fall-corridor.mp4",
+      "/videos/feature-1-processed/ticket-gate-flow.mp4",
+    ]);
+
     for (const clip of pipelineApi!.pipelineClips) {
-      expect(clip.src).toStartWith("/feature-1/");
       expect(clip.stages).toEqual(["Detect", "Track", "Assess", "Respond"]);
     }
   });

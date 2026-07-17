@@ -14,8 +14,8 @@ export const pipelineClips: PipelineClip[] = [
   {
     id: "crowd",
     event: "Crowd compression",
-    location: "Concourse A · Camera 04",
-    src: "/feature-1/crowd-compression.mp4",
+    location: "Tanah Abang Platform 2 · Camera 02",
+    src: "/videos/feature-1-processed/dense-platform-crowd.mp4",
     description:
       "Density rises while average movement slows inside a monitored concourse zone.",
     signal: "Elevated density",
@@ -24,21 +24,21 @@ export const pipelineClips: PipelineClip[] = [
   {
     id: "person-down",
     event: "Possible person down",
-    location: "Platform 2 · Camera 07",
-    src: "/feature-1/person-down.mp4",
+    location: "Tanah Abang Link Corridor · Camera 01",
+    src: "/videos/feature-1-processed/passenger-fall-corridor.mp4",
     description:
       "A horizontal posture and low movement persist long enough to require operator review.",
     signal: "Review required",
     stages: [...PIPELINE_STAGES],
   },
   {
-    id: "queue",
-    event: "Passenger queue pressure",
-    location: "Boarding gate · Camera 11",
-    src: "/feature-1/passenger-queue.mp4",
+    id: "restricted-zone",
+    event: "Restricted zone intrusion",
+    location: "Tanah Abang Ticket Gates · Camera 01",
+    src: "/videos/feature-1-processed/ticket-gate-flow.mp4",
     description:
-      "The camera view becomes operational context for crowd flow and dispatch decisions.",
-    signal: "Flow monitored",
+      "Persistent entries inside the configured restricted zone are surfaced for operator review.",
+    signal: "9 events detected",
     stages: [...PIPELINE_STAGES],
   },
 ];
