@@ -1,0 +1,209 @@
+{
+  "status": "ready",
+  "confidence": 0.82,
+  "source": "C:\\Users\\ASUS\\Documents\\Computer Science\\garudahacks\\server",
+  "generated_at": "2026-07-17T09:18:51.148Z",
+  "analysis": {
+    "project_name": "server",
+    "language": "python",
+    "package_manager": "",
+    "framework": "fastapi",
+    "services": [
+      {
+        "name": "server",
+        "source_path": ".",
+        "language": "python",
+        "framework": "fastapi",
+        "package_manager": "npm",
+        "build_command": "",
+        "start_command": "",
+        "dockerfile": true,
+        "dockerfile_path": "Dockerfile",
+        "docker_exposed_ports": [],
+        "ignored_ports": [],
+        "unsupported_protocols": [],
+        "port": 8000,
+        "port_evidence": "",
+        "persistent_paths": [],
+        "dependencies": [
+          "postgres"
+        ],
+        "runtime_vars": [
+          "DATABASE_URL",
+          "FRONTEND_URL",
+          "GEMINI_API_KEY",
+          "GEMINI_MODEL",
+          "GOOGLE_API_KEY",
+          "REPORT_LLM_PROVIDER"
+        ],
+        "build_time_vars": [],
+        "late_bound_url_keys": []
+      }
+    ],
+    "warnings": []
+  },
+  "context": {
+    "project_id": null,
+    "service_id": null,
+    "deployment_id": null,
+    "source": "new_project",
+    "reason": "No saved OpenDeploy context found."
+  },
+  "complexity": {
+    "level": 4,
+    "class": "stateful",
+    "reason": "Managed dependency env must be created, waited on, and read back before app deploy."
+  },
+  "services": [
+    {
+      "name": "server",
+      "source_path": ".",
+      "language": "python",
+      "framework": "fastapi",
+      "package_manager": "npm",
+      "build_command": "",
+      "start_command": "",
+      "dockerfile": true,
+      "dockerfile_path": "Dockerfile",
+      "docker_exposed_ports": [],
+      "ignored_ports": [],
+      "unsupported_protocols": [],
+      "port": 8000,
+      "port_evidence": "",
+      "persistent_paths": [],
+      "dependencies": [
+        "postgres"
+      ],
+      "runtime_vars": [
+        "DATABASE_URL",
+        "FRONTEND_URL",
+        "GEMINI_API_KEY",
+        "GEMINI_MODEL",
+        "GOOGLE_API_KEY",
+        "REPORT_LLM_PROVIDER"
+      ],
+      "build_time_vars": [],
+      "late_bound_url_keys": []
+    }
+  ],
+  "dependencies": [
+    "postgres"
+  ],
+  "env": {
+    "user_env_keys": [],
+    "user_build_env_keys": [],
+    "values_redacted": true
+  },
+  "env_contract": {
+    "server": [
+      "DATABASE_URL"
+    ]
+  },
+  "ports": {
+    "server": 8000
+  },
+  "evidence": [
+    {
+      "service": "server",
+      "decision": "source_root",
+      "value": ".",
+      "evidence": "Using repository root."
+    },
+    {
+      "service": "server",
+      "decision": "deploy_mode",
+      "value": "existing_dockerfile",
+      "evidence": "Source-root Dockerfile exists."
+    },
+    {
+      "service": "server",
+      "decision": "port",
+      "value": 8000,
+      "evidence": "Selected from framework/start command evidence for fastapi."
+    },
+    {
+      "service": "server",
+      "decision": "dependencies",
+      "value": [
+        "postgres"
+      ],
+      "evidence": "Detected dependency signals for postgres."
+    }
+  ],
+  "platform_fit": {
+    "one_http_port": true,
+    "requires_persistent_filesystem": false,
+    "requires_object_storage": false,
+    "unsupported_protocols": []
+  },
+  "archive_manifest": {
+    "excluded_patterns": [
+      ".git/*",
+      "node_modules/*",
+      "dist/*",
+      "target/*",
+      "platform/*",
+      "coverage/*",
+      ".next/*",
+      ".turbo/*",
+      ".cache/*",
+      ".parcel-cache/*",
+      ".venv/*",
+      "__pycache__/*",
+      "*.pyc",
+      ".opendeploy/*",
+      ".env",
+      ".env.*",
+      ".pypirc",
+      ".netrc",
+      "*.pem",
+      "*.key",
+      "id_rsa",
+      "id_rsa.pub",
+      "id_ed25519",
+      "id_ed25519.pub",
+      "credentials.json",
+      "service-account*.json",
+      "*kubeconfig*",
+      "build/*"
+    ],
+    "included_overrides": [],
+    "required_files": [],
+    "excluded_required_files": [],
+    "secret_like_entries": [],
+    "git_metadata": {
+      "required": false,
+      "bind_mount": false,
+      "references": [],
+      "git_path_type": "missing",
+      "archive_excludes_git": true,
+      "suggested_build_vars": [
+        "GIT_COMMIT",
+        "APP_VERSION",
+        "SOURCE_VERSION"
+      ]
+    },
+    "warnings": []
+  },
+  "mutations": [
+    "create_project",
+    "create_dependency:postgres",
+    "create_service:server",
+    "upload_source",
+    "create_deployment",
+    "resolve_domain"
+  ],
+  "consents": [],
+  "blocking_issues": [],
+  "warnings": [],
+  "review": null,
+  "fallback_commands": [
+    "opendeploy regions list --json",
+    "opendeploy projects create --name <name> --repo file://upload --skip-validation true --json",
+    "opendeploy dependencies create --body .opendeploy/dependency-<dependency>.json --json",
+    "opendeploy dependencies status <project-id> --json",
+    "opendeploy services create <project-id> --body service.json --json",
+    "opendeploy upload update-source <project-id> <source-path> --project-name <name> --region-id <region-id> --json",
+    "opendeploy deployments create --project <project-id> --service <service-id> --json"
+  ]
+}

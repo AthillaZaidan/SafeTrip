@@ -1,0 +1,7 @@
+{
+  "project_id": "320df166-e4f4-4478-b891-4cbcd0cc0ee5",
+  "dependency_id": "5b75e66a-9c8e-4a7e-9965-f9280ceca1cb",
+  "name": "postgres",
+  "kind": "postgres",
+  "version": "15"
+}

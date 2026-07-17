@@ -1,0 +1,30 @@
+{
+  "name": "server-v2",
+  "type": "web",
+  "source_path": ".",
+  "language": "python",
+  "framework": "fastapi",
+  "package_manager": "npm",
+  "build_command": "",
+  "start_command": "",
+  "dockerfile_path": "Dockerfile",
+  "docker_exposed_ports": [],
+  "ignored_ports": [],
+  "unsupported_protocols": [],
+  "port": 8000,
+  "port_evidence": "",
+  "persistent_paths": [],
+  "dependencies": [
+    "postgres"
+  ],
+  "runtime_vars": [
+    "DATABASE_URL",
+    "FRONTEND_URL",
+    "GEMINI_API_KEY",
+    "GEMINI_MODEL",
+    "GOOGLE_API_KEY",
+    "REPORT_LLM_PROVIDER"
+  ],
+  "build_time_vars": [],
+  "late_bound_url_keys": []
+}
