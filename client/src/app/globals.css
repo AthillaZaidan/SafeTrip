@@ -1,26 +1,32 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  /* SAFE TRIP palette — see docs/DESIGN.md */
+  --color-primary: #0052ff; /* Coinbase Blue */
+  --color-primary-active: #003ecc;
+  --color-surface-soft: #f7f7f7;
+  --color-surface-strong: #eef0f3;
+  --color-hairline: #e2e8f0;
+  
+  --color-steel: #a9b4d0;
+  --color-cloud: #f4f4f6; /* Cloud Gray — app canvas */
+  --color-ink: #101828; /* Ink Navy — headings on light */
+  --color-muted: #667085; /* Slate Muted — secondary text */
+  --color-signal: #22c55e; /* Signal Green — online / resolved */
+  --color-alert: #d92d20; /* Alert Red — SOS / urgent */
+  --color-teal: #1f5f6b; /* Deep Teal — secondary actions */
+  --color-amber-soft: #f5a623; /* Amber Companion — avatar accent */
+  --color-frost: #d9e1f2; /* Soft white-blue text on navy */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-cloud);
+  color: var(--color-ink);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
 }
