@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+import httpx
 from dotenv import dotenv_values
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from ..schemas.investigations import VLMResult
 from ..schemas.reports import SearchAttributes
@@ -15,7 +17,30 @@ from ..schemas.reports import SearchAttributes
 # Leave headroom for the prompt and JSON schema under Gemini's 20 MB request limit.
 MAX_INLINE_VIDEO_BYTES = 19_000_000
 DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite"
+DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
+DEFAULT_OLLAMA_REPORT_MODEL = "qwen3:4b-instruct"
 DEFAULT_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
+
+
+class OllamaReportExtraction(BaseModel):
+    location: str = Field(default="", description="Explicit station location.")
+    upper_clothing: str = Field(
+        default="", description="Explicit upper clothing including color."
+    )
+    lower_clothing: str = Field(
+        default="", description="Explicit lower clothing including color."
+    )
+    direction: str = Field(
+        default="",
+        description="Explicit movement direction and destination, such as menuju Exit D.",
+    )
+    event: str = Field(
+        default="", description="Explicit action, such as berjalan or berlari."
+    )
+    accessories: list[str] = Field(
+        default_factory=list,
+        description="All explicit bags, backpacks, and carried accessories.",
+    )
 
 
 class InvestigationAI:
@@ -25,8 +50,10 @@ class InvestigationAI:
         env: Mapping[str, str] | None = None,
         model: str | None = None,
         env_file: str | Path | None = DEFAULT_ENV_FILE,
+        http_client: httpx.Client | None = None,
     ):
         self._client = client
+        self._http_client = http_client
         if env is None:
             file_values = (
                 {
@@ -41,32 +68,50 @@ class InvestigationAI:
         else:
             self._env = env
         self.model = model or self._env.get("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
+        self.report_provider = self._env.get("REPORT_LLM_PROVIDER", "gemini").lower()
+        self.ollama_base_url = self._env.get(
+            "OLLAMA_BASE_URL", DEFAULT_OLLAMA_BASE_URL
+        ).rstrip("/")
+        self.ollama_report_model = self._env.get(
+            "OLLAMA_REPORT_MODEL", DEFAULT_OLLAMA_REPORT_MODEL
+        )
 
     def extract_report(
         self,
         report: Any,
         cached_extraction: SearchAttributes | dict | None = None,
     ) -> tuple[SearchAttributes, str]:
-        client = self._get_client()
-        if client is None:
-            attributes, source = self._cached_or_fallback_extraction(cached_extraction)
-        else:
+        if self.report_provider == "ollama":
             try:
-                response = client.models.generate_content(
-                    model=self.model,
-                    contents=self._extraction_prompt(report),
-                    config={
-                        "response_mime_type": "application/json",
-                        "response_schema": SearchAttributes,
-                        "temperature": 0,
-                    },
-                )
-                attributes = SearchAttributes.model_validate(response.parsed)
-                source = "gemini"
+                attributes = self._extract_report_with_ollama(report)
+                source = "ollama"
             except Exception:
                 attributes, source = self._cached_or_fallback_extraction(
                     cached_extraction
                 )
+        else:
+            client = self._get_client()
+            if client is None:
+                attributes, source = self._cached_or_fallback_extraction(
+                    cached_extraction
+                )
+            else:
+                try:
+                    response = client.models.generate_content(
+                        model=self.model,
+                        contents=self._extraction_prompt(report),
+                        config={
+                            "response_mime_type": "application/json",
+                            "response_schema": SearchAttributes,
+                            "temperature": 0,
+                        },
+                    )
+                    attributes = SearchAttributes.model_validate(response.parsed)
+                    source = "gemini"
+                except Exception:
+                    attributes, source = self._cached_or_fallback_extraction(
+                        cached_extraction
+                    )
 
         overrides = {
             field: value
@@ -82,6 +127,60 @@ class InvestigationAI:
             {**attributes.model_dump(), **overrides}
         )
         return merged, source
+
+    def _extract_report_with_ollama(self, report: Any) -> SearchAttributes:
+        client = self._http_client or httpx.Client(timeout=60.0)
+        response = client.post(
+            f"{self.ollama_base_url}/api/chat",
+            json={
+                "model": self.ollama_report_model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Extract every explicitly stated CCTV search attribute. "
+                            "Call submit_search_attributes exactly once. Do not "
+                            "explain and do not infer identity."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": getattr(report, "description", ""),
+                    },
+                ],
+                "stream": False,
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "submit_search_attributes",
+                            "description": "Submit extracted CCTV search attributes.",
+                            "parameters": self._ollama_tool_schema(),
+                        },
+                    }
+                ],
+                "options": {"temperature": 0, "num_predict": 256},
+            },
+        )
+        response.raise_for_status()
+        merged_arguments: dict[str, Any] = {}
+        for tool_call in response.json()["message"]["tool_calls"]:
+            function = tool_call.get("function", {})
+            if function.get("name") != "submit_search_attributes":
+                continue
+            arguments = function.get("arguments", {})
+            if isinstance(arguments, str):
+                arguments = json.loads(arguments)
+            if isinstance(arguments, dict):
+                merged_arguments.update(arguments)
+        if not merged_arguments:
+            raise ValueError("Ollama did not return search attributes.")
+        extraction = OllamaReportExtraction.model_validate(merged_arguments)
+        return SearchAttributes.model_validate(extraction.model_dump())
+
+    @staticmethod
+    def _ollama_tool_schema() -> dict[str, Any]:
+        return OllamaReportExtraction.model_json_schema()
 
     def verify_clip(
         self,
@@ -185,7 +284,12 @@ class InvestigationAI:
     def _extraction_prompt(report: Any) -> str:
         return (
             "Extract only observable search attributes from this CCTV incident "
-            "report. Leave unknown fields empty and do not infer identity.\n\n"
+            "report. Fill every field supported by the report. Map shirts, jackets, "
+            "and tops (baju, kemeja, jaket) to upper_clothing; trousers, pants, and "
+            "skirts (celana, rok) to lower_clothing; backpacks and bags (ransel, "
+            "tas) to accessories; and walking or running actions to event. Preserve "
+            "stated colors and movement direction. Leave unknown fields empty and "
+            "do not infer identity.\n\n"
             f"Report: {getattr(report, 'description', '')}"
         )
 

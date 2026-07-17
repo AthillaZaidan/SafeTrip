@@ -1,5 +1,8 @@
 import datetime
+import json
 from types import SimpleNamespace
+
+import httpx
 
 from server.app.schemas.investigations import VLMResult
 from server.app.schemas.reports import SearchAttributes
@@ -113,6 +116,138 @@ def test_live_extraction_validates_output_and_explicit_fields_win():
     call = client.models.calls[0]
     assert call["model"] == "gemini-test"
     assert call["config"]["response_schema"] is SearchAttributes
+
+
+def test_ollama_extraction_uses_qwen_structured_output_and_explicit_fields_win():
+    requests = []
+
+    def handler(request: httpx.Request):
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "message": {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "function": {
+                                "name": "submit_search_attributes",
+                                "arguments": {
+                                    **_cached_extraction(),
+                                    "location": "Wrong model location",
+                                    "direction": "away from Exit D",
+                                },
+                            }
+                        }
+                    ],
+                }
+            },
+        )
+
+    report = _report(
+        location="Lantai 1 Concourse",
+        direction="toward Exit D",
+    )
+    http_client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    attributes, source = InvestigationAI(
+        env={
+            "REPORT_LLM_PROVIDER": "ollama",
+            "OLLAMA_BASE_URL": "http://ollama.test",
+            "OLLAMA_REPORT_MODEL": "qwen3:4b-instruct",
+        },
+        http_client=http_client,
+    ).extract_report(report)
+
+    assert source == "ollama"
+    assert attributes.location == "Lantai 1 Concourse"
+    assert attributes.direction == "toward Exit D"
+    assert attributes.upper_clothing == "grey jacket"
+    payload = json.loads(requests[0].content)
+    assert str(requests[0].url) == "http://ollama.test/api/chat"
+    assert payload["model"] == "qwen3:4b-instruct"
+    assert payload["stream"] is False
+    tool = payload["tools"][0]["function"]
+    assert tool["name"] == "submit_search_attributes"
+    assert set(tool["parameters"]["properties"]) == {
+        "location",
+        "upper_clothing",
+        "lower_clothing",
+        "direction",
+        "event",
+        "accessories",
+    }
+    assert tool["parameters"]["properties"]["direction"]["description"]
+    assert tool["parameters"]["properties"]["event"]["description"]
+    assert payload["options"]["temperature"] == 0
+    assert payload["options"]["num_predict"] == 256
+
+
+def test_ollama_failure_uses_cached_extraction():
+    def handler(_request: httpx.Request):
+        return httpx.Response(503, json={"error": "model unavailable"})
+
+    attributes, source = InvestigationAI(
+        env={"REPORT_LLM_PROVIDER": "ollama"},
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    ).extract_report(_report(), cached_extraction=_cached_extraction())
+
+    assert source == "cached"
+    assert attributes.upper_clothing == "grey jacket"
+
+
+def test_ollama_extraction_merges_attributes_from_multiple_tool_calls():
+    def handler(_request: httpx.Request):
+        return httpx.Response(
+            200,
+            json={
+                "message": {
+                    "tool_calls": [
+                        {
+                            "function": {
+                                "name": "submit_search_attributes",
+                                "arguments": {
+                                    "upper_clothing": "jaket abu-abu",
+                                    "lower_clothing": "celana hitam",
+                                    "accessories": ["tas ransel hitam"],
+                                },
+                            }
+                        },
+                        {
+                            "function": {
+                                "name": "submit_search_attributes",
+                                "arguments": {
+                                    "direction": "menuju Exit D",
+                                    "event": "berjalan",
+                                },
+                            }
+                        },
+                    ]
+                }
+            },
+        )
+
+    attributes, source = InvestigationAI(
+        env={"REPORT_LLM_PROVIDER": "ollama"},
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    ).extract_report(_report(description="report", direction=""))
+
+    assert source == "ollama"
+    assert attributes.upper_clothing == "jaket abu-abu"
+    assert attributes.lower_clothing == "celana hitam"
+    assert attributes.accessories == ["tas ransel hitam"]
+    assert attributes.direction == "menuju Exit D"
+    assert attributes.event == "berjalan"
+
+
+def test_extraction_prompt_explains_clothing_and_accessory_field_mapping():
+    prompt = InvestigationAI._extraction_prompt(_report())
+
+    assert "lower_clothing" in prompt
+    assert "accessories" in prompt
+    assert "backpack" in prompt
+    assert "Fill every field supported by the report" in prompt
 
 
 def test_missing_credentials_uses_cached_extraction():
