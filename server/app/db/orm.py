@@ -214,6 +214,7 @@ class InvestigationTimelineEntry(Base):
     candidate_id = Column(Integer, ForeignKey("candidate_clips.id"), nullable=True)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
     camera_id = Column(String(64), default="")
+    location = Column(String(256), default="")
     note = Column(Text, default="")
     sort_order = Column(Integer, default=0)
 

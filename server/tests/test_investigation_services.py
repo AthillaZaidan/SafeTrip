@@ -6,12 +6,16 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from server.app.database import Base
-from server.app.db.orm import AuditEvent
+from server.app.db.orm import AuditEvent, InvestigationTimelineEntry
 from server.app.routes.investigations import (
     create_investigation as create_investigation_route,
 )
+from server.app.routes.investigations import (
+    get_investigation_timeline as get_timeline_route,
+)
 from server.app.routes.investigations import list_candidates as list_candidates_route
-from server.app.schemas.investigations import InvestigationCreate
+from server.app.routes.investigations import update_candidate as update_candidate_route
+from server.app.schemas.investigations import CandidateUpdate, InvestigationCreate
 from server.app.schemas.reports import SearchAttributes
 from server.app.services.investigation_ai import InvestigationAI
 from server.app.services.investigation_service import (
@@ -47,6 +51,21 @@ def _report_data(description=None):
         or "Orang berjaket abu-abu dan membawa tas hitam berlari menuju Exit D.",
         "direction": "toward Exit D",
     }
+
+
+def _create_confirmed_investigation(db_session):
+    report_service = ReportService(db_session, ai=InvestigationAI(env={}))
+    report = report_service.create_report(_report_data())
+    extracted = report_service.extract_attributes(report.report_id)
+    report_service.update_attributes(
+        report.report_id,
+        SearchAttributes.model_validate(extracted).model_dump(mode="json"),
+    )
+    service = InvestigationService(db_session, ai=InvestigationAI(env={}))
+    investigation = service.create_investigation(report.report_id)
+    return service, investigation, service.list_candidates(
+        investigation.investigation_id
+    )
 
 
 def test_cached_service_flow_persists_ranked_vlm_candidates(db_session):
@@ -151,3 +170,125 @@ def test_candidate_route_exposes_metadata_vlm_and_truthful_media_state(db_sessio
     assert first.vlm_result.source == "cached"
     assert first.media_available is False
     assert first.url is None
+
+
+def test_candidate_review_is_scoped_to_its_investigation(db_session):
+    service, first_investigation, first_candidates = (
+        _create_confirmed_investigation(db_session)
+    )
+    _, second_investigation, _ = _create_confirmed_investigation(db_session)
+    candidate = first_candidates[0]
+
+    result = service.update_candidate(
+        second_investigation.investigation_id,
+        candidate.candidate_id,
+        "confirmed",
+        note="wrong investigation",
+    )
+
+    assert result is None
+    assert candidate.verification_status == "pending"
+    assert db_session.query(InvestigationTimelineEntry).count() == 0
+    assert first_investigation.status == "awaiting_review"
+
+    with pytest.raises(HTTPException) as error:
+        update_candidate_route(
+            second_investigation.investigation_id,
+            candidate.candidate_id,
+            CandidateUpdate(
+                verification_status="confirmed",
+                note="wrong investigation",
+            ),
+            db_session,
+        )
+    assert error.value.status_code == 404
+
+
+def test_rejection_removes_prior_timeline_entry_idempotently(db_session):
+    service, investigation, candidates = _create_confirmed_investigation(db_session)
+    candidate = candidates[0]
+
+    service.update_candidate(
+        investigation.investigation_id,
+        candidate.candidate_id,
+        "confirmed",
+        note="Matches the passenger report",
+    )
+    entry = db_session.query(InvestigationTimelineEntry).one()
+    assert entry.note == "Matches the passenger report"
+    assert entry.location == "Lantai 1 Concourse"
+
+    service.update_candidate(
+        investigation.investigation_id,
+        candidate.candidate_id,
+        "rejected",
+        note="Operator rejected after closer review",
+    )
+    service.update_candidate(
+        investigation.investigation_id,
+        candidate.candidate_id,
+        "rejected",
+    )
+
+    assert candidate.verification_status == "rejected"
+    assert db_session.query(InvestigationTimelineEntry).count() == 0
+
+
+def test_confirmed_timeline_is_chronological_and_human_verified(db_session):
+    service, investigation, candidates = _create_confirmed_investigation(db_session)
+    by_clip = {candidate.clip_id: candidate for candidate in candidates}
+
+    service.update_candidate(
+        investigation.investigation_id,
+        by_clip["CLIP-TA-007"].candidate_id,
+        "confirmed",
+        note="Seen near Exit D",
+    )
+    service.update_candidate(
+        investigation.investigation_id,
+        by_clip["CLIP-TA-001"].candidate_id,
+        "confirmed",
+        note="First seen at concourse",
+    )
+
+    timeline = get_timeline_route(investigation.investigation_id, db_session)
+
+    assert [entry.location for entry in timeline] == [
+        "Lantai 1 Concourse",
+        "Exit D Link",
+    ]
+    assert [entry.note for entry in timeline] == [
+        "First seen at concourse",
+        "Seen near Exit D",
+    ]
+    assert [entry.sort_order for entry in timeline] == [0, 1]
+    assert all(entry.human_verified for entry in timeline)
+    assert investigation.status == "in_progress"
+
+
+def test_review_completes_only_after_every_candidate_is_decided(db_session):
+    service, investigation, candidates = _create_confirmed_investigation(db_session)
+
+    service.update_candidate(
+        investigation.investigation_id,
+        candidates[0].candidate_id,
+        "confirmed",
+    )
+    assert investigation.status == "in_progress"
+
+    for candidate in candidates[1:]:
+        service.update_candidate(
+            investigation.investigation_id,
+            candidate.candidate_id,
+            "rejected",
+        )
+
+    assert investigation.status == "review_complete"
+    assert db_session.query(InvestigationTimelineEntry).count() == 1
+
+
+def test_timeline_route_returns_404_for_unknown_investigation(db_session):
+    with pytest.raises(HTTPException) as error:
+        get_timeline_route("missing-investigation", db_session)
+
+    assert error.value.status_code == 404

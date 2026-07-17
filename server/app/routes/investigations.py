@@ -41,23 +41,31 @@ def list_candidates(investigation_id: str, db: Session = Depends(get_db)):
     return [_candidate_to_schema(candidate) for candidate in candidates]
 
 
-@router.patch("/{investigation_id}/candidates/{candidate_id}")
+@router.patch(
+    "/{investigation_id}/candidates/{candidate_id}",
+    response_model=CandidateSchema,
+)
 def update_candidate(investigation_id: str, candidate_id: str, data: CandidateUpdate, db: Session = Depends(get_db)):
     result = InvestigationService(db).update_candidate(
-        investigation_id, candidate_id, data.verification_status
+        investigation_id,
+        candidate_id,
+        data.verification_status,
+        data.note,
     )
     if not result:
         raise HTTPException(404, "Candidate not found")
-    return {"candidate_id": candidate_id, "verification_status": result.verification_status}
+    return _candidate_to_schema(result)
 
 
-@router.get("/{investigation_id}/timeline")
+@router.get(
+    "/{investigation_id}/timeline",
+    response_model=list[TimelineEntrySchema],
+)
 def get_investigation_timeline(investigation_id: str, db: Session = Depends(get_db)):
     entries = InvestigationService(db).get_timeline(investigation_id)
-    return [
-        {"id": e.id, "camera_id": e.camera_id, "timestamp": e.timestamp, "note": e.note, "sort_order": e.sort_order}
-        for e in entries
-    ]
+    if entries is None:
+        raise HTTPException(404, "Investigation not found")
+    return [_timeline_to_schema(entry) for entry in entries]
 
 
 def _inv_to_detail(inv):
@@ -74,8 +82,11 @@ def _inv_to_detail(inv):
             )
         ],
         "timeline_entries": [
-            {"id": e.id, "camera_id": e.camera_id, "timestamp": e.timestamp, "note": e.note, "sort_order": e.sort_order}
-            for e in inv.timeline_entries
+            _timeline_to_schema(entry)
+            for entry in sorted(
+                inv.timeline_entries,
+                key=lambda entry: (entry.timestamp, entry.id),
+            )
         ],
     }
 
@@ -96,4 +107,16 @@ def _candidate_to_schema(candidate) -> CandidateSchema:
         media_available=bool(metadata.get("media_available")),
         timestamp=candidate.timestamp,
         verification_status=candidate.verification_status,
+    )
+
+
+def _timeline_to_schema(entry) -> TimelineEntrySchema:
+    return TimelineEntrySchema(
+        id=entry.id,
+        camera_id=entry.camera_id or "",
+        location=entry.location or "",
+        timestamp=entry.timestamp,
+        note=entry.note or "",
+        sort_order=entry.sort_order,
+        human_verified=True,
     )

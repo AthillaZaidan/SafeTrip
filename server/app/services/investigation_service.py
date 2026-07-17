@@ -70,41 +70,116 @@ class InvestigationService:
             .all()
         )
 
-    def update_candidate(self, investigation_id: str, candidate_id: str, verification_status: str) -> Optional[CandidateClip]:
-        candidate = self.db.query(CandidateClip).filter(CandidateClip.candidate_id == candidate_id).first()
-        if not candidate:
+    def update_candidate(
+        self,
+        investigation_id: str,
+        candidate_id: str,
+        verification_status: str,
+        note: str | None = None,
+    ) -> Optional[CandidateClip]:
+        investigation = self.get_investigation(investigation_id)
+        if investigation is None:
             return None
-        candidate.verification_status = verification_status
-        if verification_status == "confirmed":
-            timeline_entry = (
-                self.db.query(InvestigationTimelineEntry)
-                .filter(InvestigationTimelineEntry.candidate_id == candidate.id)
-                .first()
+        candidate = (
+            self.db.query(CandidateClip)
+            .filter(
+                CandidateClip.investigation_id == investigation.id,
+                CandidateClip.candidate_id == candidate_id,
             )
+            .first()
+        )
+        if candidate is None:
+            return None
+        if verification_status not in {"confirmed", "rejected"}:
+            raise ValueError("verification_status must be confirmed or rejected")
+
+        candidate.verification_status = verification_status
+        timeline_entry = (
+            self.db.query(InvestigationTimelineEntry)
+            .filter(InvestigationTimelineEntry.candidate_id == candidate.id)
+            .first()
+        )
+        if verification_status == "confirmed":
             if timeline_entry is None:
-                self.db.add(InvestigationTimelineEntry(
+                timeline_entry = InvestigationTimelineEntry(
                     investigation_id=candidate.investigation_id,
                     candidate_id=candidate.id,
-                    timestamp=candidate.timestamp or datetime.datetime.utcnow(),
+                    timestamp=candidate.timestamp
+                    or datetime.datetime.now(datetime.UTC),
                     camera_id=candidate.camera_id,
-                    note=f"Candidate {candidate_id} confirmed",
-                    sort_order=candidate.score * 100,
-                ))
-            candidate.investigation.status = "in_progress"
-        self._audit("candidate", candidate_id, verification_status)
+                    location=candidate.location,
+                    note=note or f"Candidate {candidate_id} confirmed",
+                    sort_order=0,
+                )
+                self.db.add(timeline_entry)
+            else:
+                timeline_entry.timestamp = (
+                    candidate.timestamp or timeline_entry.timestamp
+                )
+                timeline_entry.camera_id = candidate.camera_id
+                timeline_entry.location = candidate.location
+                if note is not None:
+                    timeline_entry.note = note
+        elif timeline_entry is not None:
+            self.db.delete(timeline_entry)
+
+        self.db.flush()
+        self._update_review_status(investigation)
+        self._renumber_timeline(investigation.id)
+        self._audit(
+            "candidate",
+            candidate_id,
+            verification_status,
+            {
+                "investigation_id": investigation_id,
+                **({"note": note} if note else {}),
+            },
+        )
         self.db.commit()
         return candidate
 
-    def get_timeline(self, investigation_id: str) -> list[InvestigationTimelineEntry]:
+    def get_timeline(
+        self,
+        investigation_id: str,
+    ) -> Optional[list[InvestigationTimelineEntry]]:
         inv = self.get_investigation(investigation_id)
         if not inv:
-            return []
+            return None
         return (
             self.db.query(InvestigationTimelineEntry)
             .filter(InvestigationTimelineEntry.investigation_id == inv.id)
             .order_by(InvestigationTimelineEntry.timestamp.asc())
             .all()
         )
+
+    def _update_review_status(self, investigation: Investigation):
+        statuses = [
+            status
+            for (status,) in (
+                self.db.query(CandidateClip.verification_status)
+                .filter(CandidateClip.investigation_id == investigation.id)
+                .all()
+            )
+        ]
+        if statuses and all(status != "pending" for status in statuses):
+            investigation.status = "review_complete"
+        elif "confirmed" in statuses:
+            investigation.status = "in_progress"
+        else:
+            investigation.status = "awaiting_review"
+
+    def _renumber_timeline(self, investigation_id: int):
+        entries = (
+            self.db.query(InvestigationTimelineEntry)
+            .filter(InvestigationTimelineEntry.investigation_id == investigation_id)
+            .order_by(
+                InvestigationTimelineEntry.timestamp.asc(),
+                InvestigationTimelineEntry.id.asc(),
+            )
+            .all()
+        )
+        for sort_order, entry in enumerate(entries):
+            entry.sort_order = sort_order
 
     def _generate_candidates(self, investigation: Investigation, report: Report):
         attributes = SearchAttributes.model_validate(report.attributes or {})
