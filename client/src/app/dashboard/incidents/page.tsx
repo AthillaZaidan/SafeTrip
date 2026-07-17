@@ -6,10 +6,12 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import { fetchIncidents, updateIncident, type IncidentList, ApiError } from "@/lib/api";
 
 function mapToCard(i: IncidentList) {
+  const incident: any = i;
   return {
     id: `ST-${i.incident_id.substring(0, 6).toUpperCase()}`,
+    fullId: i.incident_id,
     description: `${i.incident_type.replace(/_/g, " ")} detected at ${i.location || "unknown location"}`,
-    resolvedBy: "—",
+    resolvedBy: incident.assignments?.[0]?.officer_name || "—",
     resolvedAt: i.created_at
       ? new Date(i.created_at).toLocaleDateString("en-GB", {
           day: "numeric",
@@ -21,10 +23,13 @@ function mapToCard(i: IncidentList) {
   };
 }
 
+type TabType = "unresolved" | "resolved";
+
 export default function IncidentReportPage() {
   const [incidents, setIncidents] = useState<IncidentList[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>("unresolved");
 
   async function load() {
     try {
@@ -60,6 +65,11 @@ export default function IncidentReportPage() {
     }
   };
 
+  const filteredIncidents = incidents.filter((i) => {
+    if (activeTab === "resolved") return i.status === "resolved";
+    return i.status !== "resolved";
+  });
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -69,6 +79,30 @@ export default function IncidentReportPage() {
           className="rounded-full bg-primary px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-primary-active"
         >
           Refresh
+        </button>
+      </div>
+      
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-hairline pb-4">
+        <button
+          onClick={() => setActiveTab("unresolved")}
+          className={`rounded-full px-5 py-2 text-sm font-bold transition-colors ${
+            activeTab === "unresolved"
+              ? "bg-surface-strong text-ink"
+              : "text-muted hover:bg-surface-strong hover:text-ink"
+          }`}
+        >
+          Unresolved
+        </button>
+        <button
+          onClick={() => setActiveTab("resolved")}
+          className={`rounded-full px-5 py-2 text-sm font-bold transition-colors ${
+            activeTab === "resolved"
+              ? "bg-surface-strong text-ink"
+              : "text-muted hover:bg-surface-strong hover:text-ink"
+          }`}
+        >
+          Resolved
         </button>
       </div>
 
@@ -83,11 +117,11 @@ export default function IncidentReportPage() {
         <div className="flex justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
         </div>
-      ) : incidents.length === 0 && !error ? (
-        <p className="py-12 text-center text-muted">No incidents found.</p>
+      ) : filteredIncidents.length === 0 && !error ? (
+        <p className="py-12 text-center text-muted">No {activeTab} incidents found.</p>
       ) : (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {incidents.map((incident) => (
+          {filteredIncidents.map((incident) => (
             <IncidentCard
               key={incident.incident_id}
               incident={mapToCard(incident)}
