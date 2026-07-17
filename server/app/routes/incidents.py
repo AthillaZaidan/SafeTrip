@@ -24,7 +24,21 @@ def list_incidents(
     severity: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    return IncidentService(db).list_incidents(status=status, severity=severity)
+    incidents = IncidentService(db).list_incidents(status=status, severity=severity)
+    return [
+        {
+            "incident_id": i.incident_id,
+            "incident_type": i.incident_type,
+            "severity": i.severity,
+            "risk_score": i.risk_score,
+            "status": i.status,
+            "location": i.location or "",
+            "camera_id": i.camera_ref.camera_id if i.camera_ref else "",
+            "timestamp": i.timestamp,
+            "created_at": i.created_at,
+        }
+        for i in incidents
+    ]
 
 
 @router.post("", response_model=IncidentDetail)
