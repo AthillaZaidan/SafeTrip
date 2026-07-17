@@ -151,6 +151,7 @@ export default function DashboardPage() {
                       key={cam.camera_id}
                       label={cam.name}
                       boxes={[{ x: 40, y: 30, w: 20, h: 40, kind: "flag" }]}
+                      videoSrc="/videos/feature-1/Adult_falls_on_floor_202607171330.mp4"
                       alert
                     />
                   ))}

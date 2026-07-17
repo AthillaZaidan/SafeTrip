@@ -27,8 +27,21 @@ const DEMO_BOXES: BoundingBox[][] = [
   ],
 ];
 
+const DEMO_VIDEOS = [
+  "/videos/feature-1/Adult_falls_on_floor_202607171330.mp4",
+  "/videos/feature-1/Adult_walks_along_platform_202607171208.mp4",
+  "/videos/feature-1/Dense_crowd_on_platform_202607171216.mp4",
+  "/videos/feature-1/Indonesian_commuters_walking_through_ticket_gates_202607171431.mp4",
+  "/videos/feature-1/Indonesian_commuters_walking_through_ticket_gates_202607171435.mp4",
+  "/videos/feature-1/Passenger_falls_in_corridor_202607171243.mp4",
+];
+
 function boxesForCamera(index: number): BoundingBox[] {
   return DEMO_BOXES[index % DEMO_BOXES.length];
+}
+
+function videoForCamera(index: number): string {
+  return DEMO_VIDEOS[index % DEMO_VIDEOS.length];
 }
 
 function isAlert(cam: Camera): boolean {
@@ -165,12 +178,13 @@ export default function LiveMonitoringPage() {
             ) : (
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {urgentCams.map((cam, i) => (
-                  <CctvTile
-                    key={cam.camera_id}
-                    label={`${cam.name} · ${cam.location}`}
-                    boxes={boxesForCamera(i)}
-                    alert={isAlert(cam)}
-                  />
+                    <CctvTile
+                      key={cam.camera_id}
+                      label={`${cam.name} · ${cam.location}`}
+                      boxes={boxesForCamera(i)}
+                      videoSrc={videoForCamera(i)}
+                      alert={isAlert(cam)}
+                    />
                 ))}
               </div>
             )}
@@ -205,12 +219,13 @@ export default function LiveMonitoringPage() {
             ) : (
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {otherCams.map((cam, i) => (
-                  <CctvTile
-                    key={cam.camera_id}
-                    label={`${cam.name} · ${cam.location}`}
-                    boxes={boxesForCamera(i + urgentCams.length)}
-                    alert={isAlert(cam)}
-                  />
+                    <CctvTile
+                      key={cam.camera_id}
+                      label={`${cam.name} · ${cam.location}`}
+                      boxes={boxesForCamera(i + urgentCams.length)}
+                      videoSrc={videoForCamera(i + urgentCams.length)}
+                      alert={isAlert(cam)}
+                    />
                 ))}
               </div>
             )}

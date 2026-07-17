@@ -62,7 +62,7 @@ export default function CommuterHomePage() {
       <motion.section variants={itemVariants} className="relative overflow-hidden flex items-center justify-between gap-5 rounded-[24px] bg-white p-6 md:p-8 shadow-sm border border-hairline">
         <div className="absolute top-0 right-0 h-full w-32 md:w-64 bg-gradient-to-l from-primary/5 to-transparent pointer-events-none" />
         <div className="min-w-0 relative z-10">
-          <h1 className="truncate text-2xl md:text-3xl font-extrabold text-ink tracking-tight">
+          <h1 className="truncate text-xl md:text-2xl font-extrabold text-ink tracking-tight">
             Welcome, {user?.name ?? "XXX"}!
           </h1>
           <div className="mt-3 md:mt-4 flex h-2.5 w-36 md:w-48 overflow-hidden rounded-full bg-teal/20">
