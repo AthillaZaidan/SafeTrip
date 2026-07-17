@@ -11,7 +11,9 @@ __pycache__/
 
 # Generated vision artifacts and large local assets
 outputs/
-data/demo-videos/
+# data/demo-videos/
+# !data/demo-videos/feature-1/
+# !data/demo-videos/feature-2/
 data/investigation-videos/
 data/cached-ai/
 models/
