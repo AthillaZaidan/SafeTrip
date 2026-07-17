@@ -1,11 +1,11 @@
 [
   {
-    "clip_id": "CLIP-TA-01-TARGET",
+    "clip_id": "CLIP-TA-001",
     "camera_id": "CAM_TA_LEVEL_1_CONCOURSE",
     "location": "Lantai 1 Concourse",
     "start_time": "2026-07-17T17:09:10+07:00",
     "end_time": "2026-07-17T17:09:25+07:00",
-    "path": "data/investigation-videos/clip-ta-01-target.mp4",
+    "path": "data/investigation-videos/clip-ta-001.mp4",
     "attributes": {
       "upper_clothing": "grey jacket",
       "lower_clothing": "dark trousers",
@@ -24,12 +24,12 @@
     }
   },
   {
-    "clip_id": "CLIP-TA-01-WRONG-UPPER",
+    "clip_id": "CLIP-TA-002",
     "camera_id": "CAM_TA_LEVEL_1_CONCOURSE",
     "location": "Lantai 1 Concourse",
     "start_time": "2026-07-17T17:09:25+07:00",
     "end_time": "2026-07-17T17:09:40+07:00",
-    "path": "data/investigation-videos/clip-ta-01-wrong-upper.mp4",
+    "path": "data/investigation-videos/clip-ta-002.mp4",
     "attributes": {
       "upper_clothing": "blue jacket",
       "lower_clothing": "dark trousers",
@@ -48,22 +48,22 @@
     }
   },
   {
-    "clip_id": "CLIP-TA-01-WRONG-BAG",
+    "clip_id": "CLIP-TA-003",
     "camera_id": "CAM_TA_LEVEL_1_CONCOURSE",
     "location": "Lantai 1 Concourse",
     "start_time": "2026-07-17T17:09:40+07:00",
     "end_time": "2026-07-17T17:09:55+07:00",
-    "path": "data/investigation-videos/clip-ta-01-wrong-bag.mp4",
+    "path": "data/investigation-videos/clip-ta-003.mp4",
     "attributes": {
       "upper_clothing": "grey jacket",
       "lower_clothing": "dark trousers",
-      "accessories": ["red backpack"],
-      "direction": "toward Exit D",
+      "accessories": ["black backpack"],
+      "direction": "away from Exit D",
       "event": "running"
     },
     "cached_vlm_result": {
-      "supported_attributes": ["grey jacket", "dark trousers", "movement toward Exit D", "running"],
-      "contradicted_attributes": ["Backpack appears red, not black"],
+      "supported_attributes": ["grey jacket", "dark trousers", "black backpack", "running"],
+      "contradicted_attributes": ["Subject moves away from Exit D"],
       "uncertainties": [],
       "relevant_start_seconds": 2.0,
       "relevant_end_seconds": 10.0,
@@ -72,12 +72,12 @@
     }
   },
   {
-    "clip_id": "CLIP-TA-02-TARGET",
+    "clip_id": "CLIP-TA-004",
     "camera_id": "CAM_TA_LEVEL_2_MEZZANINE",
     "location": "Lantai 2 Mezzanine",
     "start_time": "2026-07-17T17:10:00+07:00",
     "end_time": "2026-07-17T17:10:15+07:00",
-    "path": "data/investigation-videos/clip-ta-02-target.mp4",
+    "path": "data/investigation-videos/clip-ta-004.mp4",
     "attributes": {
       "upper_clothing": "grey jacket",
       "lower_clothing": "dark trousers",
@@ -96,12 +96,12 @@
     }
   },
   {
-    "clip_id": "CLIP-TA-02-WRONG-UPPER",
+    "clip_id": "CLIP-TA-005",
     "camera_id": "CAM_TA_LEVEL_2_MEZZANINE",
     "location": "Lantai 2 Mezzanine",
     "start_time": "2026-07-17T17:10:15+07:00",
     "end_time": "2026-07-17T17:10:30+07:00",
-    "path": "data/investigation-videos/clip-ta-02-wrong-upper.mp4",
+    "path": "data/investigation-videos/clip-ta-005.mp4",
     "attributes": {
       "upper_clothing": "blue jacket",
       "lower_clothing": "dark trousers",
@@ -120,12 +120,12 @@
     }
   },
   {
-    "clip_id": "CLIP-TA-02-WRONG-BAG",
+    "clip_id": "CLIP-TA-006",
     "camera_id": "CAM_TA_LEVEL_2_MEZZANINE",
     "location": "Lantai 2 Mezzanine",
     "start_time": "2026-07-17T17:10:30+07:00",
     "end_time": "2026-07-17T17:10:45+07:00",
-    "path": "data/investigation-videos/clip-ta-02-wrong-bag.mp4",
+    "path": "data/investigation-videos/clip-ta-006.mp4",
     "attributes": {
       "upper_clothing": "grey jacket",
       "lower_clothing": "dark trousers",
@@ -144,12 +144,12 @@
     }
   },
   {
-    "clip_id": "CLIP-TA-03-TARGET",
+    "clip_id": "CLIP-TA-007",
     "camera_id": "CAM_TA_EXIT_D_LINK",
     "location": "Exit D Link",
     "start_time": "2026-07-17T17:10:50+07:00",
     "end_time": "2026-07-17T17:11:05+07:00",
-    "path": "data/investigation-videos/clip-ta-03-target.mp4",
+    "path": "data/investigation-videos/clip-ta-007.mp4",
     "attributes": {
       "upper_clothing": "grey jacket",
       "lower_clothing": "dark trousers",
@@ -168,22 +168,22 @@
     }
   },
   {
-    "clip_id": "CLIP-TA-03-WRONG-UPPER",
+    "clip_id": "CLIP-TA-008",
     "camera_id": "CAM_TA_EXIT_D_LINK",
     "location": "Exit D Link",
     "start_time": "2026-07-17T17:11:05+07:00",
     "end_time": "2026-07-17T17:11:20+07:00",
-    "path": "data/investigation-videos/clip-ta-03-wrong-upper.mp4",
+    "path": "data/investigation-videos/clip-ta-008.mp4",
     "attributes": {
-      "upper_clothing": "blue jacket",
+      "upper_clothing": "grey jacket",
       "lower_clothing": "dark trousers",
       "accessories": ["black backpack"],
-      "direction": "toward Exit D",
+      "direction": "away from Exit D",
       "event": "running"
     },
     "cached_vlm_result": {
-      "supported_attributes": ["dark trousers", "black backpack", "movement toward Exit D", "running"],
-      "contradicted_attributes": ["Upper clothing appears blue, not grey"],
+      "supported_attributes": ["grey jacket", "dark trousers", "black backpack", "running"],
+      "contradicted_attributes": ["Subject moves away from Exit D"],
       "uncertainties": [],
       "relevant_start_seconds": 1.5,
       "relevant_end_seconds": 11.5,
@@ -192,12 +192,12 @@
     }
   },
   {
-    "clip_id": "CLIP-TA-03-WRONG-BAG",
+    "clip_id": "CLIP-TA-009",
     "camera_id": "CAM_TA_EXIT_D_LINK",
     "location": "Exit D Link",
     "start_time": "2026-07-17T17:11:20+07:00",
     "end_time": "2026-07-17T17:11:35+07:00",
-    "path": "data/investigation-videos/clip-ta-03-wrong-bag.mp4",
+    "path": "data/investigation-videos/clip-ta-009.mp4",
     "attributes": {
       "upper_clothing": "grey jacket",
       "lower_clothing": "dark trousers",

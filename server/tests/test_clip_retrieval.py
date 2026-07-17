@@ -88,6 +88,24 @@ def test_load_clip_library_does_not_require_local_media(tmp_path):
     assert load_clip_library(path)[0]["path"].endswith("CLIP-MISSING.mp4")
 
 
+def test_load_clip_library_rejects_non_list_accessories(tmp_path):
+    clip = _clip("CLIP-1")
+    clip["attributes"]["accessories"] = None
+    path = _write_library(tmp_path, [clip])
+
+    with pytest.raises(ValueError, match="accessories"):
+        load_clip_library(path)
+
+
+def test_load_clip_library_rejects_invalid_cached_vlm_enum(tmp_path):
+    clip = _clip("CLIP-1")
+    clip["cached_vlm_result"]["match_recommendation"] = "definite_match"
+    path = _write_library(tmp_path, [clip])
+
+    with pytest.raises(ValueError, match="cached_vlm_result"):
+        load_clip_library(path)
+
+
 def test_retrieval_hard_filters_time_window_and_camera_ids():
     clips = [
         _clip("IN-WINDOW", camera_id="CAM_A", minute=10),
@@ -168,6 +186,13 @@ def test_tracked_tanah_abang_library_is_complete_and_deterministic():
 
     assert len(clips) == 9
     assert len({clip["clip_id"] for clip in clips}) == 9
+    assert [clip["clip_id"] for clip in clips] == [
+        f"CLIP-TA-{number:03d}" for number in range(1, 10)
+    ]
+    assert [clip["path"] for clip in clips] == [
+        f"data/investigation-videos/clip-ta-{number:03d}.mp4"
+        for number in range(1, 10)
+    ]
     assert all(clip["path"].startswith("data/investigation-videos/") for clip in clips)
     cached_fields = {
         "supported_attributes",
@@ -194,7 +219,14 @@ def test_tracked_tanah_abang_library_is_complete_and_deterministic():
         "Exit D Link",
     }
 
-    targets = [clip for clip in clips if clip["clip_id"].endswith("TARGET")]
+    target_attributes = {
+        "upper_clothing": "grey jacket",
+        "lower_clothing": "dark trousers",
+        "accessories": ["black backpack"],
+        "direction": "toward Exit D",
+        "event": "running",
+    }
+    targets = [clip for clip in clips if clip["attributes"] == target_attributes]
     assert len(targets) == 3
     assert [clip["camera_id"] for clip in targets] == [
         "CAM_TA_LEVEL_1_CONCOURSE",
@@ -204,6 +236,7 @@ def test_tracked_tanah_abang_library_is_complete_and_deterministic():
     assert [clip["start_time"] for clip in targets] == sorted(
         clip["start_time"] for clip in targets
     )
+    variation_types = set()
     for target in targets:
         distractors = [
             clip
@@ -220,10 +253,14 @@ def test_tracked_tanah_abang_library_is_complete_and_deterministic():
                 "location": distractor["location"],
                 **distractor["attributes"],
             }
-            assert sum(
-                target_values[field] != distractor_values[field]
+            changed_fields = {
+                field
                 for field in target_values
-            ) == 1
+                if target_values[field] != distractor_values[field]
+            }
+            assert len(changed_fields) == 1
+            variation_types.update(changed_fields)
+    assert variation_types == {"upper_clothing", "accessories", "direction"}
 
     report = SearchAttributes(
         time_window_start=_timestamp(9),
@@ -236,7 +273,7 @@ def test_tracked_tanah_abang_library_is_complete_and_deterministic():
     ranked = retrieve_candidates(report, clips)
 
     assert [item["clip_id"] for item in ranked[:3]] == [
-        "CLIP-TA-01-TARGET",
-        "CLIP-TA-02-TARGET",
-        "CLIP-TA-03-TARGET",
+        "CLIP-TA-001",
+        "CLIP-TA-004",
+        "CLIP-TA-007",
     ]

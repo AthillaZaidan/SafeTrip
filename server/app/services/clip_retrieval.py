@@ -4,6 +4,9 @@ import datetime
 import json
 from pathlib import Path
 
+from pydantic import ValidationError
+
+from ..schemas.investigations import VLMResult
 from ..schemas.reports import SearchAttributes
 
 
@@ -24,15 +27,6 @@ REQUIRED_ATTRIBUTE_FIELDS = {
     "direction",
     "event",
 }
-REQUIRED_VLM_FIELDS = {
-    "supported_attributes",
-    "contradicted_attributes",
-    "uncertainties",
-    "relevant_start_seconds",
-    "relevant_end_seconds",
-    "match_recommendation",
-    "source",
-}
 MATCH_WEIGHTS = {
     "location": 0.20,
     "upper_clothing": 0.30,
@@ -43,8 +37,10 @@ MATCH_WEIGHTS = {
 
 
 def _parse_timestamp(value: object, field: str, clip_id: str) -> datetime.datetime:
+    if not isinstance(value, str):
+        raise ValueError(f"clip {clip_id!r} has invalid {field}")
     try:
-        return datetime.datetime.fromisoformat(str(value))
+        return datetime.datetime.fromisoformat(value)
     except ValueError as error:
         raise ValueError(f"clip {clip_id!r} has invalid {field}") from error
 
@@ -71,6 +67,10 @@ def load_clip_library(path: str | Path) -> list[dict]:
             raise ValueError(f"duplicate clip_id: {clip_id}")
         seen_ids.add(clip_id)
 
+        for field in ("camera_id", "location", "path"):
+            if not isinstance(clip[field], str) or not clip[field].strip():
+                raise ValueError(f"clip {clip_id!r} has invalid {field}")
+
         if not isinstance(clip["attributes"], dict):
             raise ValueError(f"clip {clip_id!r} attributes must be an object")
         missing_attributes = REQUIRED_ATTRIBUTE_FIELDS - clip["attributes"].keys()
@@ -79,13 +79,24 @@ def load_clip_library(path: str | Path) -> list[dict]:
                 f"clip {clip_id!r} attributes missing required fields: {sorted(missing_attributes)}"
             )
 
+        for field in ("upper_clothing", "lower_clothing", "direction", "event"):
+            value = clip["attributes"][field]
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"clip {clip_id!r} has invalid {field}")
+        accessories = clip["attributes"]["accessories"]
+        if not isinstance(accessories, list) or not all(
+            isinstance(value, str) and value.strip() for value in accessories
+        ):
+            raise ValueError(f"clip {clip_id!r} has invalid accessories")
+
         if not isinstance(clip["cached_vlm_result"], dict):
             raise ValueError(f"clip {clip_id!r} cached_vlm_result must be an object")
-        missing_vlm = REQUIRED_VLM_FIELDS - clip["cached_vlm_result"].keys()
-        if missing_vlm:
-            raise ValueError(
-                f"clip {clip_id!r} cached_vlm_result missing required fields: {sorted(missing_vlm)}"
-            )
+        try:
+            cached_result = VLMResult.model_validate(clip["cached_vlm_result"])
+        except ValidationError as error:
+            raise ValueError(f"clip {clip_id!r} has invalid cached_vlm_result") from error
+        if cached_result.source != "cached":
+            raise ValueError(f"clip {clip_id!r} cached_vlm_result must use source 'cached'")
 
         start = _parse_timestamp(clip["start_time"], "start_time", clip_id)
         end = _parse_timestamp(clip["end_time"], "end_time", clip_id)
