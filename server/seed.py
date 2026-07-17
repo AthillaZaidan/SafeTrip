@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.database import Base, ENGINE, SessionLocal
-from app.db.orm import Camera, Officer, Playbook, Zone
+from app.db.orm import Camera, Officer, Playbook, Zone, Incident, Assignment
 
 DB_PATH = Path(__file__).resolve().parent / "data" / "transitshield.db"
 
@@ -89,12 +89,44 @@ DEMO_PLAYBOOKS = [
     },
 ]
 
+DEMO_INCIDENTS = [
+    {
+        "incident_type": "restricted_zone_intrusion",
+        "severity": "medium",
+        "risk_score": 0.65,
+        "status": "open",
+        "location": "Platform B, South Entrance",
+        "description": "Subject crossed yellow line while train approaching",
+        "source_mode": "auto",
+    },
+    {
+        "incident_type": "crowd_compression",
+        "severity": "high",
+        "risk_score": 0.85,
+        "status": "assigned",
+        "location": "Concourse A, Main Corridor",
+        "description": "High density detected near Exit 2 gate",
+        "source_mode": "auto",
+    },
+    {
+        "incident_type": "possible_person_down",
+        "severity": "critical",
+        "risk_score": 0.95,
+        "status": "resolved",
+        "location": "Platform A, Center",
+        "description": "Passenger slipped and fell, medical assistance provided",
+        "source_mode": "manual_report",
+    }
+]
+
 Base.metadata.create_all(bind=ENGINE)
 
 
 def seed():
     db = SessionLocal()
     try:
+        db.query(Assignment).delete()
+        db.query(Incident).delete()
         db.query(Zone).delete()
         db.query(Camera).delete()
         db.query(Officer).delete()
@@ -116,7 +148,23 @@ def seed():
             db.add(Playbook(**p))
 
         db.commit()
-        print(f"Seeded {len(DEMO_CAMERAS)} cameras, {len(DEMO_OFFICERS)} officers, {len(DEMO_PLAYBOOKS)} playbooks")
+
+        # Seed incidents
+        officer = db.query(Officer).first()
+        for i_data in DEMO_INCIDENTS:
+            incident = Incident(**i_data)
+            db.add(incident)
+            if incident.status == "assigned" or incident.status == "resolved":
+                db.flush()
+                assignment = Assignment(
+                    incident_id=incident.id,
+                    officer_id=officer.id,
+                    status="assigned" if incident.status == "assigned" else "resolved"
+                )
+                db.add(assignment)
+
+        db.commit()
+        print(f"Seeded {len(DEMO_CAMERAS)} cameras, {len(DEMO_OFFICERS)} officers, {len(DEMO_PLAYBOOKS)} playbooks, {len(DEMO_INCIDENTS)} incidents")
         print(f"Database: {DB_PATH.resolve()}")
     finally:
         db.close()
