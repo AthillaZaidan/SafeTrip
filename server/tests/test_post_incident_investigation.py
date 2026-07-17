@@ -222,6 +222,26 @@ def test_candidate_and_timeline_schemas_expose_evidence_fields():
     assert timeline.human_verified is True
 
 
+def test_persisted_candidate_without_vlm_result_validates_as_none(db_session):
+    candidate = CandidateClip(
+        candidate_id="candidate-without-vlm",
+        investigation_id=1,
+    )
+    db_session.add(candidate)
+    db_session.commit()
+    db_session.expire_all()
+
+    persisted = (
+        db_session.query(CandidateClip)
+        .filter_by(candidate_id="candidate-without-vlm")
+        .one()
+    )
+    validated = investigation_schemas.CandidateSchema.model_validate(persisted)
+
+    assert persisted.vlm_result is None
+    assert validated.vlm_result is None
+
+
 def test_timeline_allows_at_most_one_entry_per_candidate():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)

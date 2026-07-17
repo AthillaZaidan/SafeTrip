@@ -196,7 +196,7 @@ class CandidateClip(Base):
     camera_id = Column(String(64), default="")
     location = Column(String(256), default="")
     clip_metadata = Column(JSON, default=dict)
-    vlm_result = Column(JSON, default=dict)
+    vlm_result = Column(JSON, nullable=True, default=None)
     timestamp = Column(DateTime, nullable=True)
     verification_status = Column(String(32), default="pending")
 
