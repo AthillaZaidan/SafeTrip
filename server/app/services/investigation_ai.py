@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from dotenv import dotenv_values
 from pydantic import ValidationError
 
 from ..schemas.investigations import VLMResult
@@ -14,6 +15,7 @@ from ..schemas.reports import SearchAttributes
 # Leave headroom for the prompt and JSON schema under Gemini's 20 MB request limit.
 MAX_INLINE_VIDEO_BYTES = 19_000_000
 DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite"
+DEFAULT_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 
 
 class InvestigationAI:
@@ -22,9 +24,22 @@ class InvestigationAI:
         client: Any = None,
         env: Mapping[str, str] | None = None,
         model: str | None = None,
+        env_file: str | Path | None = DEFAULT_ENV_FILE,
     ):
         self._client = client
-        self._env = env if env is not None else os.environ
+        if env is None:
+            file_values = (
+                {
+                    key: value
+                    for key, value in dotenv_values(env_file).items()
+                    if value is not None
+                }
+                if env_file is not None
+                else {}
+            )
+            self._env = {**file_values, **os.environ}
+        else:
+            self._env = env
         self.model = model or self._env.get("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
 
     def extract_report(

@@ -111,12 +111,14 @@ python -m pip install -r server/requirements.txt
 uvicorn server.app.main:app --reload
 ```
 
-Live Gemini is optional:
+Live Gemini is optional. Create `.env` at the repository root:
 
 ```bash
-export GEMINI_API_KEY="your-key"
-export GEMINI_MODEL="gemini-3.1-flash-lite"  # optional; this is the default
+cp .env.example .env
+# Edit .env and fill in GEMINI_API_KEY.
 ```
+
+The application loads this file automatically. Shell environment variables override `.env`, and `GOOGLE_API_KEY` takes precedence over `GEMINI_API_KEY`.
 
 Copy generated videos into `data/investigation-videos/`. The adapter sends only MP4 files smaller than the safe inline request threshold. If a video, credential, or Gemini response is unavailable, the controlled demo uses the corresponding cached result. A non-demo report without a usable AI result receives `source: fallback` and empty unsupported attributes.
 

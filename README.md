@@ -38,14 +38,14 @@ python -m pip install -r server/requirements.txt
 uvicorn server.app.main:app --reload
 ```
 
-Gemini is optional for the deterministic demo. To enable live structured extraction and video verification:
+Gemini is optional for the deterministic demo. Create a local environment file to enable live structured extraction and video verification:
 
 ```bash
-export GEMINI_API_KEY="your-key"
-export GEMINI_MODEL="gemini-3.1-flash-lite"  # optional; this is the default
+cp .env.example .env
+# Edit .env and fill in GEMINI_API_KEY. GEMINI_MODEL is already set to Flash-Lite.
 ```
 
-`GOOGLE_API_KEY` is also accepted and takes precedence over `GEMINI_API_KEY`. Without credentials or local footage, the controlled Tanah Abang scenario uses cached extraction and cached VLM explanations. Unrelated reports return an explicit `fallback` source instead of fabricated attributes.
+The repository-root `.env` file is loaded automatically and ignored by Git. Values exported by the shell override `.env`. `GOOGLE_API_KEY` is also accepted and takes precedence over `GEMINI_API_KEY`. Without credentials or local footage, the controlled Tanah Abang scenario uses cached extraction and cached VLM explanations. Unrelated reports return an explicit `fallback` source instead of fabricated attributes.
 
 Generated MP4 files belong in the ignored `data/investigation-videos/` directory using the neutral names `clip-ta-001.mp4` through `clip-ta-009.mp4`. Missing media is returned as `url: null` and `media_available: false`.
 

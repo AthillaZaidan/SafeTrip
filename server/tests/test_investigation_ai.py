@@ -68,6 +68,20 @@ def test_default_model_uses_cost_efficient_flash_lite():
     assert InvestigationAI(env={}).model == "gemini-3.1-flash-lite"
 
 
+def test_env_file_is_loaded_and_shell_environment_wins(tmp_path, monkeypatch):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "GEMINI_API_KEY=file-key\nGEMINI_MODEL=model-from-file\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("GEMINI_MODEL", "model-from-shell")
+
+    ai = InvestigationAI(env_file=env_file)
+
+    assert ai._env["GEMINI_API_KEY"] == "file-key"
+    assert ai.model == "model-from-shell"
+
+
 def test_live_extraction_validates_output_and_explicit_fields_win():
     parsed = {
         **_cached_extraction(),

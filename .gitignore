@@ -5,6 +5,9 @@ __pycache__/
 *.egg-info/
 .ipynb_checkpoints/
 .superpowers/
+.env
+.env.*
+!.env.example
 
 # Generated vision artifacts and large local assets
 outputs/
