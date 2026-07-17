@@ -64,6 +64,10 @@ def _cached_vlm():
     }
 
 
+def test_default_model_uses_cost_efficient_flash_lite():
+    assert InvestigationAI(env={}).model == "gemini-3.1-flash-lite"
+
+
 def test_live_extraction_validates_output_and_explicit_fields_win():
     parsed = {
         **_cached_extraction(),
@@ -194,4 +198,3 @@ def test_no_cache_returns_honest_fallback_without_supported_attributes(tmp_path)
     assert result.supported_attributes == []
     assert result.contradicted_attributes == []
     assert result.uncertainties
-

@@ -42,7 +42,7 @@ Gemini is optional for the deterministic demo. To enable live structured extract
 
 ```bash
 export GEMINI_API_KEY="your-key"
-export GEMINI_MODEL="gemini-3.5-flash"  # optional override
+export GEMINI_MODEL="gemini-3.1-flash-lite"  # optional; this is the default
 ```
 
 `GOOGLE_API_KEY` is also accepted and takes precedence over `GEMINI_API_KEY`. Without credentials or local footage, the controlled Tanah Abang scenario uses cached extraction and cached VLM explanations. Unrelated reports return an explicit `fallback` source instead of fabricated attributes.

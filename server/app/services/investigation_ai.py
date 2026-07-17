@@ -13,7 +13,7 @@ from ..schemas.reports import SearchAttributes
 
 # Leave headroom for the prompt and JSON schema under Gemini's 20 MB request limit.
 MAX_INLINE_VIDEO_BYTES = 19_000_000
-DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite"
 
 
 class InvestigationAI:
