@@ -1,4 +1,4 @@
-# SafeTrip | National Winners @ Garuda Hacks 7.0
+# SafeTrip | National Winner @ Garuda Hacks 7.0
 
 SafeTrip is a human-in-the-loop railway safety and CCTV investigation system. It combines real-time computer vision, deterministic safety rules, a local language model, and Gemini video understanding to support two complementary workflows:
 
